@@ -10,7 +10,7 @@ services:
     volumes:
       - ./configs/wk.yaml:/root/wukongim/wk.yaml
       - ./logs/wk:/root/wukongim/logs
-  tangsengdaodaoserver:  # 唐僧叨叨的业务服务
+  tangsengdaodaoserver:  # QX的业务服务
     image: registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver:latest
     restart: always
     command: "api"
@@ -28,7 +28,7 @@ services:
     volumes:
       - ./configs/tsdd.yaml:/home/configs/tsdd.yaml
       - ./logs/tsdd:/home/logs
-  tangsengdaodaoweb:  # 唐僧叨叨的web服务
+  tangsengdaodaoweb:  # QX的web服务
     image: registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoweb:latest
     restart: always
     environment:
