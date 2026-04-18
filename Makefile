@@ -1,6 +1,6 @@
 deploy:
-	docker build -t tangsengdaodaoserver . --platform linux/amd64
-# 	docker login --username=hi500*****@aliyun.com crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com
+	docker build -t tangsengdaodaoserver . --platform linux/arm64/v8
+	docker login --username=hi50071365@aliyun.com crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com
 	docker tag tangsengdaodaoserver crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/server:latest
 	docker push crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/server:latest
 

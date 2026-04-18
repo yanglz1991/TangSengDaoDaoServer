@@ -16,7 +16,7 @@ services:
       - WK_EXTERNAL_IP=${EXTERNAL_IP}
   tangsengdaodaoserver:
     # 唐僧叨叨的业务服务
-    image: ghcr.io/tangsengdaodao/tangsengdaodaoserver:latest
+    image: crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/server:latest
     container_name: ${CONTAINER_NAME}-tsdd-serve
     restart: always
     # command: "api"
