@@ -15,13 +15,14 @@ services:
     ports:
       - 3306:3306    
   wukongim: # wukongim底层通讯服务
-    image: wukongim/wukongim:latest
+    # image: wukongim/wukongim:latest
+    image: registry.cn-shanghai.aliyuncs.com/wukongim/wukongim:v2
     restart: always
     volumes:
       - ./wukongimdata:/root/wukongim
     environment:
       WK_MODE: "debug"
-      WK_EXTERNAL_IP: "192.168.99.219"
+      WK_EXTERNAL_IP: "127.0.0.1"
     ports:
       - 5001:5001 # http api 端口
       - 5100:5100 # tcp端口

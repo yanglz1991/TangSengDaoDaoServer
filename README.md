@@ -2,6 +2,19 @@
 
 `开发环境需要go >=1.20`
 
+
+启动基础环境镜像 docker 启动 MySQL Redis wukongim
+
+```shell
+docker compose -f testenv/docker-compose.yaml up -d
+```
+
+运行代码
+
+```shell
+go run main.go
+```
+
 功能特性
 ------------
 - [x] 全局特性
