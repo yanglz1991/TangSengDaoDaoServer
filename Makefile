@@ -9,4 +9,4 @@ run-dev:
 stop-dev:
 	docker-compose stop
 env-test:
-	docker-compose -f ./testenv/docker-compose.yaml up -d 
+	docker-compose -f ./testenv/docker-compose.yaml up -d

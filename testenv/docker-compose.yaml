@@ -22,7 +22,7 @@ services:
       - ./wukongimdata:/root/wukongim
     environment:
       WK_MODE: "debug"
-      WK_EXTERNAL_IP: "127.0.0.1"
+      WK_EXTERNAL_IP: "192.168.31.176"
     ports:
       - 5001:5001 # http api 端口
       - 5100:5100 # tcp端口

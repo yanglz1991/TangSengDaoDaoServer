@@ -9,11 +9,20 @@
 docker compose -f testenv/docker-compose.yaml up -d
 ```
 
-运行代码
+运行代码 先修改服务ip `testenv/docker-compose.yaml` 中的 `WK_EXTERNAL_IP`
 
 ```shell
 go run main.go
 ```
+
+打包镜像推送阿里云
+
+```shell
+make deploy
+```
+
+修改默认配置 `configs/tsdd.yaml`
+
 
 功能特性
 ------------
