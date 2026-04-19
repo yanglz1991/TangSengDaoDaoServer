@@ -34,7 +34,7 @@ services:
     environment:
       - API_URL
     ports:
-      - "82:80" 
+      - "80:80" 
   minio: # minio文件管理服务
     image: minio/minio:latest # use a remote image
     expose:

@@ -5,7 +5,7 @@ CONTAINER_NAME=my
 EXTERNAL_IP=47.239.98.68
 
 # mysql root用户的密码
-MYSQL_ROOT_PASSWORD=a123123bc
+MYSQL_ROOT_PASSWORD=mysql#888999
 # mysql默认数据库名字
 MYSQL_DATABASE=im
 
@@ -14,7 +14,7 @@ MYSQL_DATABASE=im
 # minio文件服务的用户名
 MINIO_ROOT_USER=minio
 # minio文件服务的密码
-MINIO_ROOT_PASSWORD=a123123bc
+MINIO_ROOT_PASSWORD=minio#888999
 
 ######### WuKongIM相关的配置 #########
 
@@ -46,6 +46,6 @@ TS_SMSCODE=123456
 # 使用文件服务的类型
 TS_FILESERVICE=minio
 # 后台管理系统的管理员密码,用户名为 superAdmin，可随机填写(至少8位)
-TS_ADMINPWD=qx@888999
+TS_ADMINPWD=admin@888999
 # 系统群组名称
 # TS_ACCOUNT_SYSTEMGROUPNAME=系统大群

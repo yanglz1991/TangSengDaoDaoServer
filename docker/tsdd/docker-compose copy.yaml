@@ -1,6 +1,6 @@
 services:
   wukongim:
-    # 唐僧叨叨通讯服务（悟空IM）
+    # 悟空IM
     image: registry.cn-shanghai.aliyuncs.com/wukongim/wukongim:v2
     container_name: ${CONTAINER_NAME}-tsdd-wkim
     restart: always
@@ -15,7 +15,6 @@ services:
     environment:
       - WK_EXTERNAL_IP=${EXTERNAL_IP}
   tangsengdaodaoserver:
-    # 唐僧叨叨的业务服务
     image: crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/server:latest
     container_name: ${CONTAINER_NAME}-tsdd-serve
     restart: always
@@ -42,23 +41,21 @@ services:
       - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
       - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}
   tangsengdaodaoweb:
-    # 唐僧叨叨的web服务
     image: ghcr.io/tangsengdaodao/tangsengdaodaoweb:latest
     container_name: ${CONTAINER_NAME}-tsdd-web
     restart: always
     environment:
       - API_URL=http://${EXTERNAL_IP}:8090/
     ports:
-      - "82:80"
+      - "80:80" 
   tangsengdaodaomanager:
-    # 唐僧叨叨的后台管理系统
     image: ghcr.io/tangsengdaodao/tangsengdaodaomanager:latest
     container_name: ${CONTAINER_NAME}-tsdd-manager
     restart: always
     environment:
       - API_URL=http://${EXTERNAL_IP}:8090/
     ports:
-      - "83:80"
+      - "82:80"
   minio:
     # minio文件管理服务
     image: minio/minio:RELEASE.2024-04-06T05-26-02Z # use a remote image
