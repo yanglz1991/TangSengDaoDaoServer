@@ -41,7 +41,7 @@ services:
       - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
       - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}
   tangsengdaodaoweb:
-    image: ghcr.io/tangsengdaodao/tangsengdaodaoweb:latest
+    image: crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/web:latest
     container_name: ${CONTAINER_NAME}-tsdd-web
     restart: always
     environment:
@@ -49,7 +49,7 @@ services:
     ports:
       - "80:80" 
   tangsengdaodaomanager:
-    image: ghcr.io/tangsengdaodao/tangsengdaodaomanager:latest
+    image: crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/manager:latest
     container_name: ${CONTAINER_NAME}-tsdd-manager
     restart: always
     environment:

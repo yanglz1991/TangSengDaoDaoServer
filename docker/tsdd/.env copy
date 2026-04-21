@@ -47,5 +47,11 @@ TS_SMSCODE=123456
 TS_FILESERVICE=minio
 # 后台管理系统的管理员密码,用户名为 superAdmin，可随机填写(至少8位)
 TS_ADMINPWD=admin@888999
+# 默认头像本地文件路径（用户未设置头像时使用）
+TS_AVATAR_DEFAULT=assets/assets/admin.png
+# 默认头像数量
+TS_AVATAR_DEFAULTCOUNT=900
+# 头像分区数量
+TS_AVATAR_PARTITION=100
 # 系统群组名称
 # TS_ACCOUNT_SYSTEMGROUPNAME=系统大群
