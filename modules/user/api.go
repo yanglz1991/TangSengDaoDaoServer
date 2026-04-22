@@ -376,34 +376,25 @@ func (u *User) UserAvatar(c *wkhttp.Context) {
 		avatarID := crc32.ChecksumIEEE([]byte(uid)) % uint32(u.ctx.GetConfig().Avatar.Partition)
 		ph = fmt.Sprintf("/avatar/%d/%s.png", avatarID, uid)
 	} else {
-		// 1. 优先尝试读取本地默认头像文件（存在即返回，忽略 DefaultBaseURL）
-		if u.ctx.GetConfig().Avatar.Default != "" {
+		// 配置使用本地默认头像
+		if u.ctx.GetConfig().Avatar.Default != "" && strings.TrimSpace(u.ctx.GetConfig().Avatar.DefaultBaseURL) == "" {
+			// 读取配置的头像文件
 			avatarPath := u.ctx.GetConfig().Avatar.Default
 			imageData, err := os.ReadFile(avatarPath)
-			if err == nil {
+			if err != nil {
+				u.Error("打开本地头像文件失败", zap.Error(err))
+			} else {
 				c.Header("Content-Type", "image/png")
 				c.Header("Content-Disposition", "inline; filename=avatar.png")
 				c.Data(http.StatusOK, "image/png", imageData)
 				return
 			}
-			u.Error("打开本地头像文件失败", zap.Error(err), zap.String("path", avatarPath))
 		}
 
-		// 2. 尝试兜底的默认头像 avatar.png
-		fallbackImage, err := os.ReadFile("assets/assets/avatar.png")
-		if err == nil {
-			c.Header("Content-Type", "image/png")
-			c.Header("Content-Disposition", "inline; filename=avatar.png")
-			c.Data(http.StatusOK, "image/png", fallbackImage)
-			return
-		}
-
-		// 3. DefaultBaseURL 必须是合法 http(s) 地址才允许重定向
 		avatarID := crc32.ChecksumIEEE([]byte(uid)) % uint32(u.ctx.GetConfig().Avatar.DefaultCount)
 		ph = fmt.Sprintf("/avatar/default/test (%d).jpg", avatarID)
-		defaultBaseURL := strings.TrimSpace(u.ctx.GetConfig().Avatar.DefaultBaseURL)
-		if defaultBaseURL != "" && (strings.HasPrefix(defaultBaseURL, "http://") || strings.HasPrefix(defaultBaseURL, "https://")) {
-			downloadUrl = strings.ReplaceAll(defaultBaseURL, "{avatar}", fmt.Sprintf("%d", avatarID))
+		if strings.TrimSpace(u.ctx.GetConfig().Avatar.DefaultBaseURL) != "" {
+			downloadUrl = strings.ReplaceAll(u.ctx.GetConfig().Avatar.DefaultBaseURL, "{avatar}", fmt.Sprintf("%d", avatarID))
 		}
 	}
 	if downloadUrl == "" {

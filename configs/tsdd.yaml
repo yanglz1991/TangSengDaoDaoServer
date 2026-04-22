@@ -126,8 +126,8 @@ account:
 
 ##################### 头像 #####################
 avatar:
- defaultBaseURL: "assets/assets/admin.png" # 默认头像cdn地址
- default: "assets/assets/admin.png" # 默认头像
+#  defaultBaseURL: "" # 默认头像cdn地址
+ default: "assets/assets/avatar.png" # 默认头像
  defaultCount: 900 # 默认头像数量
  partition: 100 # 头像分区数量
 
