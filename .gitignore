@@ -31,3 +31,6 @@ logs/
 wukongimdata/
 
 testenv/
+
+docker/tsdd/.env2
+docker/tsdd/docker-compose2.yaml
