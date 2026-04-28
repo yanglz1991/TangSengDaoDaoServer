@@ -35,14 +35,15 @@ docker/tsdd/nginx/certs/qx_qhfhasina_com.key
 
 上传到服务器的：
 
-/www/server/panel/data/compose/qx-1/nginx/nginx.conf
-/www/server/panel/data/compose/qx-1/nginx/conf.d/tsdd.conf
-/www/server/panel/data/compose/qx-1/nginx/certs/qx_qhfhasina_com.crt
-/www/server/panel/data/compose/qx-1/nginx/certs/qx_qhfhasina_com.key
+/www/server/panel/data/compose/qx-2/nginx/nginx.conf
+/www/server/panel/data/compose/qx-2/nginx/conf.d/tsdd.conf
+/www/server/panel/data/compose/qx-2/nginx/certs/qx_qhfhasina_com.crt
+/www/server/panel/data/compose/qx-2/nginx/certs/qx_qhfhasina_com.key
 
 
 ```shell
 rsync -avz docker/tsdd/nginx/ root@47.239.98.68:/www/server/panel/data/compose/qx-2/nginx/
+ssh root@47.239.98.68 "cd /www/server/panel/data/compose/qx-2 && docker compose restart nginx"
 ```
 
 使用 https 之后

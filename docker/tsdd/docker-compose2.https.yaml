@@ -43,6 +43,9 @@ services:
       - TS_FILESERVICE=${TS_FILESERVICE}
       - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
       - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}
+      - TS_MINIO_URL=http://minio:9000
+      - TS_MINIO_UPLOADURL=http://minio:9000
+      - TS_MINIO_DOWNLOADURL=https://qx.qhfhasina.com:9443
   tangsengdaodaoweb:
     image: crpi-10spfkgd32nbn5ev.cn-shanghai.personal.cr.aliyuncs.com/qxim/web:latest
     container_name: ${CONTAINER_NAME}-tsdd-web
@@ -74,6 +77,7 @@ services:
       - "80:80"     # http -> 301 跳转到 https
       - "443:443"   # web + api + 悟空IM wss
       - "8443:8443" # manager 管理后台（独立端口）
+      - "9443:9443" # MinIO HTTPS 反代（让文件下载链接走 https）
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
