@@ -37,7 +37,7 @@ external:
 #  lineNum: false # 是否打印行号
 
 ##################### 短信配置 ####################
-smsCode: "123456" # 123456 测试短信验证码， 如果不为空，则短信验证码为该值。
+# smsCode: "123456" # 123456 测试短信验证码， 如果不为空，则短信验证码为该值。
 # smsProvider: "smsbao" # 短信服务商. 例如: aliyun or unisms
 #aliyunSMS:
 #  accessKeyID: "" # 阿里云短信accessKeyID

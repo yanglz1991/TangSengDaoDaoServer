@@ -32,5 +32,11 @@ wukongimdata/
 
 testenv/
 
+# 含数据库密码/短信密钥/管理员密码等敏感信息，禁止提交
 docker/tsdd/.env2
-docker/tsdd/docker-compose2.yaml
+# 备份文件
+docker/tsdd/docker-compose2.yaml.bak*
+# nginx 证书私钥和运行时日志
+docker/tsdd/nginx/certs/*.key
+docker/tsdd/nginx/certs/*.crt
+docker/tsdd/nginx/logs/
