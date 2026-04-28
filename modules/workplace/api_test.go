@@ -38,7 +38,7 @@ func TestBannerList(t *testing.T) {
 		Title:       "QX官网",
 		Description: "QX让企业轻松拥有自己的即时通讯",
 		JumpType:    0,
-		Route:       "http://qx.qhfhasina.com",
+		Route:       "https://qx.qhfhasina.com",
 	})
 	assert.NoError(t, err)
 	w := httptest.NewRecorder()

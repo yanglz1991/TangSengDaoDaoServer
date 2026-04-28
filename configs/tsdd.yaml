@@ -27,8 +27,8 @@ appName: "QX" # 项目名称
 ##################### 外网配置 ####################
 external:
  ip: "47.239.98.68" # 外网ip
- baseURL: "http://qx.qhfhasina.com:8090" # 外网访问地址 例如 http://10.2.3.1:8090 扫码加好友提示token不能为空 ：修改external.baseURL配置 app上填写的接口地址（注意地址填写基地址就行不需要加/1）
- webLoginURL: "http://qx.qhfhasina.com" # web im的登录地址 例如 https://web.tangsengdaodao.com
+ baseURL: "https://qx.qhfhasina.com/api" # 外网访问地址 例如 http://10.2.3.1:8090 扫码加好友提示token不能为空 ：修改external.baseURL配置 app上填写的接口地址（注意地址填写基地址就行不需要加/1）
+ webLoginURL: "https://qx.qhfhasina.com" # web im的登录地址 例如 https://web.tangsengdaodao.com
 
 ##################### 日志配置 ####################
 #logger:

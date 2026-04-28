@@ -51,7 +51,7 @@ var systemRobotMap = []*systemRobotMenu{
 	// {
 	// 	CMD:          "/Android包下载",
 	// 	Remark:       "如何下载QX Android包",
-	// 	ReplyContent: "您好，QX Android应用下载地址 http://qx.qhfhasina.com",
+	// 	ReplyContent: "您好，QX Android应用下载地址 https://qx.qhfhasina.com",
 	// 	Type:         string(None),
 	// },
 	// {

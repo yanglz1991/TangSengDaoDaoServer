@@ -52,3 +52,7 @@ https://qx.qhfhasina.com:8443/login
 
 客户端
 https://qx.qhfhasina.com
+
+
+客户 baseUrl
+https://qx.qhfhasina.com/api

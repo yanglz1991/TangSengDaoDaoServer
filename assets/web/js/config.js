@@ -1,1 +1,1 @@
-const apiURL = "http://qx.qhfhasina.com:8090/v1/"
+const apiURL = "https://qx.qhfhasina.com/api/v1/"
