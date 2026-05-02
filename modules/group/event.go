@@ -183,6 +183,10 @@ func (g *Group) handleGroupMemberAddEvent(data []byte, commit config.EventCommit
 				return
 			}
 			_ = g.ctx.SendGroupMemberAdd(req)
+			// 发送群成员更新CMD，通知各端（尤其是Web端）自动同步群成员列表
+			if err := g.ctx.SendGroupMemberUpdate(req.GroupNo); err != nil {
+				g.Error("发送群成员更新CMD失败！", zap.Error(err))
+			}
 		},
 	}
 }
