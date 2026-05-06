@@ -6,9 +6,9 @@ services:
     restart: always
     ports:
       - "5100:5100" # tcp长连接端口（App 客户端使用，非浏览器，不走 TLS）
-      - "5300:5300" # 监控端口
     expose:
       - "5200" # websocket 端口，仅给 nginx 容器内部反代为 wss
+      - "5300" # 悟空IM 管理端/监控后台（纯 HTTP），由 nginx 在 5443 做 TLS 反代
     volumes:
       - ./wukongim:/root/wukongim
     env_file:
@@ -78,6 +78,7 @@ services:
       - "443:443"   # web + api + 悟空IM wss
       - "8443:8443" # manager 管理后台（独立端口）
       - "9443:9443" # MinIO HTTPS 反代（让文件下载链接走 https）
+      - "5443:5443" # 悟空IM 管理端 HTTPS 反代 -> wukongim:5300
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
