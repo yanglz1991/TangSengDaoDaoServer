@@ -32,12 +32,14 @@ func NewManager(ctx *config.Context) *Manager {
 func (m *Manager) Route(r *wkhttp.WKHttp) {
 	auth := r.Group("/v1/manager", m.ctx.AuthMiddleware(r))
 	{
-		auth.GET("/common/appconfig", m.appconfig)               // 获取app配置
-		auth.POST("/common/appconfig", m.updateConfig)           // 修改app配置
-		auth.GET("/common/appmodule", m.getAppModule)            // 获取app模块
-		auth.PUT("/common/appmodule", m.updateAppModule)         // 修改app模块
-		auth.POST("/common/appmodule", m.addAppModule)           // 新增app模块
-		auth.DELETE("/common/:sid/appmodule", m.deleteAppModule) // 删除app模块
+		auth.GET("/common/appconfig", m.appconfig)                // 获取app配置
+		auth.POST("/common/appconfig", m.updateConfig)            // 修改app配置
+		auth.GET("/common/appmodule", m.getAppModule)             // 获取app模块
+		auth.PUT("/common/appmodule", m.updateAppModule)          // 修改app模块
+		auth.POST("/common/appmodule", m.addAppModule)            // 新增app模块
+		auth.DELETE("/common/:sid/appmodule", m.deleteAppModule)  // 删除app模块
+		auth.GET("/common/secure_channel", m.getSecureChannel)    // 获取加密通道配置
+		auth.PUT("/common/secure_channel", m.updateSecureChannel) // 更新加密通道配置
 	}
 }
 func (m *Manager) deleteAppModule(c *wkhttp.Context) {

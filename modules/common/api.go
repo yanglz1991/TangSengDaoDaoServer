@@ -43,11 +43,13 @@ func New(ctx *config.Context) *Common {
 func (cn *Common) Route(r *wkhttp.WKHttp) {
 	common := r.Group("/v1/common", cn.ctx.AuthMiddleware(r))
 	{
-		common.POST("/appversion", cn.addAppVersion)             // 添加APP版本
-		common.GET("/appversion/:os/:version", cn.getNewVersion) // 获取最新版本
-		common.GET("/appversion/list", cn.appVersionList)        // 版本列表
-		common.GET("/chatbg", cn.chatBgList)                     // 聊天背景列表
-		common.GET("/appmodule", cn.appModule)                   // app模块列表
+		common.POST("/appversion", cn.addAppVersion)                  // 添加APP版本
+		common.GET("/appversion/:os/:version", cn.getNewVersion)      // 获取最新版本
+		common.GET("/appversion/list", cn.appVersionList)             // 版本列表
+		common.GET("/chatbg", cn.chatBgList)                          // 聊天背景列表
+		common.GET("/appmodule", cn.appModule)                        // app模块列表
+		common.GET("/secure_channel", cn.secureChannelGet)            // 加密通道配置(不含密码与url)
+		common.POST("/secure_channel/verify", cn.secureChannelVerify) // 验证密码并下发url
 	}
 	commonNoAuth := r.Group("/v1/common")
 	{
