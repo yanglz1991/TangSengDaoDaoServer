@@ -1630,8 +1630,9 @@ func (m *Message) syncSensitiveWords(c *wkhttp.Context) {
 	resultList := make([]string, 0)
 	tips := ""
 	if reqVersion < sensitiveWordsVersion {
+		// 敏感词提示已下线，仅返回空列表与空 tips，
+		// 让客户端覆盖本地缓存，停止展示「涉及私下交易…」气泡提醒。
 		resultList = sensitive_words
-		tips = "涉及私下交易、转账等资金问题，谨慎对待，谨防上当受骗，点击标题栏头像可投诉！"
 	}
 	c.Response(&resp{
 		Tips:    tips,
