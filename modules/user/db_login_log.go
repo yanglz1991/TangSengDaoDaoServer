@@ -34,6 +34,16 @@ func (l *LoginLogDB) queryLastLoginIP(uid string) (*LoginLogModel, error) {
 	return model, nil
 }
 
+// queryLastLoginIPWithUids 批量查询一批用户最后一次登录日志
+func (l *LoginLogDB) queryLastLoginIPWithUids(uids []string) ([]*LoginLogModel, error) {
+	if len(uids) == 0 {
+		return nil, nil
+	}
+	var list []*LoginLogModel
+	_, err := l.session.SelectBySql("select * from login_log where id in ( select max(id) from login_log group by uid having uid in ?)", uids).Load(&list)
+	return list, err
+}
+
 // LoginLogModel 登录日志
 type LoginLogModel struct {
 	LoginIP string //登录IP

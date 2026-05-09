@@ -29,6 +29,7 @@ type Manager struct {
 	userSettingDB *SettingDB
 	deviceDB      *deviceDB
 	friendDB      *friendDB
+	loginLogDB    *LoginLogDB
 	onlineService IOnlineService
 	commonService common2.IService
 }
@@ -43,6 +44,7 @@ func NewManager(ctx *config.Context) *Manager {
 		friendDB:      newFriendDB(ctx),
 		userDB:        NewDB(ctx),
 		userSettingDB: NewSettingDB(ctx.DB()),
+		loginLogDB:    NewLoginLogDB(ctx.DB()),
 		onlineService: NewOnlineService(ctx),
 		commonService: common2.NewService(ctx),
 	}
@@ -581,6 +583,12 @@ func (m *Manager) list(c *wkhttp.Context) {
 			c.ResponseError(errors.New("查询用户最后一次登录设备信息错误"))
 			return
 		}
+		loginLogs, err := m.loginLogDB.queryLastLoginIPWithUids(uids)
+		if err != nil {
+			m.Error("查询用户最后一次登录IP错误", zap.Error(err))
+			c.ResponseError(errors.New("查询用户最后一次登录IP错误"))
+			return
+		}
 		var i = 0
 		for _, user := range userList {
 			var device *deviceModel
@@ -588,6 +596,15 @@ func (m *Manager) list(c *wkhttp.Context) {
 				for _, model := range devices {
 					if model.UID == user.UID {
 						device = model
+						break
+					}
+				}
+			}
+			var lastLoginIP string = ""
+			if len(loginLogs) > 0 {
+				for _, lg := range loginLogs {
+					if lg.UID == user.UID {
+						lastLoginIP = lg.LoginIP
 						break
 					}
 				}
@@ -619,6 +636,7 @@ func (m *Manager) list(c *wkhttp.Context) {
 				Sex:            user.Sex,
 				ShortNo:        user.ShortNo,
 				LastLoginTime:  lastLoginTime,
+				LastLoginIP:    lastLoginIP,
 				DeviceName:     deviceName,
 				DeviceModel:    deviceModel,
 				Online:         online,
@@ -1147,6 +1165,7 @@ type managerUserResp struct {
 	Sex            int    `json:"sex"`
 	RegisterTime   string `json:"register_time"`
 	LastLoginTime  string `json:"last_login_time"`
+	LastLoginIP    string `json:"last_login_ip"`
 	DeviceName     string `json:"device_name"`
 	DeviceModel    string `json:"device_model"`
 	Online         int    `json:"online"`

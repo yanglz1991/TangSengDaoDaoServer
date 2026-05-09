@@ -46,9 +46,12 @@ func (m *managerDB) queryUserListWithPage(pageSize, page uint64, onelineStatus i
 
 // 模糊查询用户列表
 // onelineStatus 在线状态 -1 为所有 0. 离线 1. 在线
+// 关键字匹配范围：user.name / user.uid / user.phone / user.short_no
+// 以及 login_log.login_ip(IP) 与 device.device_name / device.device_model(设备)
 func (m *managerDB) queryUserListWithPageAndKeyword(keyword string, onelineStatus int, pageSize, page uint64) ([]*managerUserModel, error) {
 	var users []*managerUserModel
-	selectStm := m.session.Select("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,max(user_online.online) online").From("user").LeftJoin("user_online", "user.uid=user_online.uid").Where("user.name like ? or user.uid like ? or user.phone like ? or user.short_no like ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+	like := "%" + keyword + "%"
+	selectStm := m.session.Select("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,max(user_online.online) online").From("user").LeftJoin("user_online", "user.uid=user_online.uid").Where("user.name like ? or user.uid like ? or user.phone like ? or user.short_no like ? or user.uid in (select uid from login_log where login_ip like ?) or user.uid in (select uid from device where device_name like ? or device_model like ?)", like, like, like, like, like, like, like)
 	if onelineStatus != -1 {
 		selectStm = selectStm.Where("user_online.online=?", onelineStatus)
 	}
@@ -60,9 +63,11 @@ func (m *managerDB) queryUserListWithPageAndKeyword(keyword string, onelineStatu
 }
 
 // 模糊查询用户数量
+// 关键字匹配范围与 queryUserListWithPageAndKeyword 保持一致
 func (m *managerDB) queryUserCountWithKeyWord(keyword string) (int64, error) {
 	var count int64
-	_, err := m.session.Select("count(*)").From("user").Where("name like ? or uid like ? or phone like ? or short_no like ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%").Load(&count)
+	like := "%" + keyword + "%"
+	_, err := m.session.Select("count(*)").From("user").Where("name like ? or uid like ? or phone like ? or short_no like ? or uid in (select uid from login_log where login_ip like ?) or uid in (select uid from device where device_name like ? or device_model like ?)", like, like, like, like, like, like, like).Load(&count)
 	return count, err
 }
 

@@ -1135,6 +1135,10 @@ func (u *User) execLogin(userInfo *Model, flag config.DeviceFlag, device *device
 
 // sendWelcomeMsg 发送欢迎语
 func (u *User) sentWelcomeMsg(publicIP, uid string) {
+	// 保存登录日志（独立于欢迎消息开关，登录就要落库）
+	// 注意：必须在下面 getLastLoginIP 之后再 add，避免欢迎消息里的"上次登录信息"取到当前这次
+	defer u.loginLog.add(uid, publicIP)
+
 	appconfig, err := u.commonService.GetAppConfig()
 	if err != nil {
 		u.Error("获取应用配置错误", zap.Error(err))
@@ -1173,8 +1177,6 @@ func (u *User) sentWelcomeMsg(publicIP, uid string) {
 	if err != nil {
 		u.Error("发送登录消息欢迎消息失败", zap.Error(err))
 	}
-	//保存登录日志
-	u.loginLog.add(uid, publicIP)
 }
 
 // 注册
