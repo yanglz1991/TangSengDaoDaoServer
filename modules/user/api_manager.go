@@ -65,6 +65,7 @@ func (m *Manager) Route(r *wkhttp.WKHttp) {
 		auth.DELETE("/user/admin", m.deleteAdminUsers)        // 删除管理员用户
 		auth.POST("/user/add", m.addUser)                     // 添加一个用户
 		auth.POST("/user/resetpassword", m.resetUserPassword) // 重置用户密码
+		auth.POST("/user/updatename", m.updateUserName)       // 修改用户昵称
 		auth.GET("/user/list", m.list)                        // 用户列表
 		auth.GET("/user/friends", m.friends)                  // 某个用户的好友
 		auth.GET("/user/blacklist", m.blacklist)              // 用户黑名单列表
@@ -241,6 +242,95 @@ func (m *Manager) resetUserPassword(c *wkhttp.Context) {
 		m.Error("重置用户密码错误", zap.Error(err))
 		c.Response("重置用户密码错误")
 		return
+	}
+	c.ResponseOK()
+}
+
+// 修改用户昵称（超管）
+func (m *Manager) updateUserName(c *wkhttp.Context) {
+	err := c.CheckLoginRoleIsSuperAdmin()
+	if err != nil {
+		c.ResponseError(err)
+		return
+	}
+
+	type reqUN struct {
+		Uid  string `json:"uid"`
+		Name string `json:"name"`
+	}
+	var req reqUN
+	if err := c.BindJSON(&req); err != nil {
+		c.ResponseError(errors.New("请求数据格式有误！"))
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Uid == "" {
+		c.ResponseError(errors.New("用户uid不能为空！"))
+		return
+	}
+	if req.Name == "" {
+		c.ResponseError(errors.New("昵称不能为空！"))
+		return
+	}
+	if len([]rune(req.Name)) > 20 {
+		c.ResponseError(errors.New("昵称长度不能超过20个字符！"))
+		return
+	}
+	user, err := m.userDB.QueryByUID(req.Uid)
+	if err != nil {
+		m.Error("查询用户信息错误", zap.Error(err))
+		c.ResponseError(errors.New("查询用户信息错误"))
+		return
+	}
+	if user == nil {
+		c.ResponseError(errors.New("操作用户不存在"))
+		return
+	}
+	if user.Name == req.Name {
+		c.ResponseOK()
+		return
+	}
+
+	err = m.userDB.UpdateUsersWithField("name", req.Name, req.Uid)
+	if err != nil {
+		m.Error("修改用户昵称错误", zap.Error(err))
+		c.ResponseError(errors.New("修改用户昵称错误"))
+		return
+	}
+
+	// 同步刷新被修改用户在各端的 token 缓存里的 name
+	for _, deviceFlag := range []config.DeviceFlag{config.APP, config.Web, config.PC} {
+		oldToken, cerr := m.ctx.Cache().Get(fmt.Sprintf("%s%d%s", m.ctx.GetConfig().Cache.UIDTokenCachePrefix, deviceFlag, req.Uid))
+		if cerr != nil || oldToken == "" {
+			continue
+		}
+		_ = m.ctx.Cache().Set(m.ctx.GetConfig().Cache.TokenCachePrefix+oldToken, wkhttp.EncodeTokenCacheInfo(req.Uid, req.Name, user.Role))
+	}
+
+	// 通知好友刷新该用户频道信息
+	friends, err := m.friendDB.QueryFriends(req.Uid)
+	if err != nil {
+		m.Error("查询用户好友错误", zap.Error(err))
+		c.ResponseOK()
+		return
+	}
+	if len(friends) > 0 {
+		uids := make([]string, 0, len(friends)+1)
+		uids = append(uids, req.Uid)
+		for _, friend := range friends {
+			uids = append(uids, friend.ToUID)
+		}
+		err = m.ctx.SendCMD(config.MsgCMDReq{
+			CMD:         common.CMDChannelUpdate,
+			Subscribers: uids,
+			Param: map[string]interface{}{
+				"channel_id":   req.Uid,
+				"channel_type": common.ChannelTypePerson,
+			},
+		})
+		if err != nil {
+			m.Error("发送频道更改消息错误！", zap.Error(err))
+		}
 	}
 	c.ResponseOK()
 }
