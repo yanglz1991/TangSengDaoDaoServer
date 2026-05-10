@@ -50,17 +50,19 @@ var qrcodeChanLock sync.RWMutex
 
 // User 用户相关API
 type User struct {
-	db            *DB
-	friendDB      *friendDB
-	deviceDB      *deviceDB
-	smsServie     commonapi.ISMSService
-	fileService   file.IService
-	settingDB     *SettingDB
-	onlineDB      *onlineDB
-	userService   IService
-	onlineService *OnlineService
-	giteeDB       *giteeDB
-	githubDB      *githubDB
+	db                *DB
+	friendDB          *friendDB
+	deviceDB          *deviceDB
+	ipBlacklistDB     *ipBlacklistDB
+	deviceBlacklistDB *deviceBlacklistDB
+	smsServie         commonapi.ISMSService
+	fileService       file.IService
+	settingDB         *SettingDB
+	onlineDB          *onlineDB
+	userService       IService
+	onlineService     *OnlineService
+	giteeDB           *giteeDB
+	githubDB          *githubDB
 
 	setting *Setting
 	log.Log
@@ -85,6 +87,8 @@ func New(ctx *config.Context) *User {
 		ctx:                      ctx,
 		db:                       NewDB(ctx),
 		deviceDB:                 newDeviceDB(ctx),
+		ipBlacklistDB:            newIPBlacklistDB(ctx),
+		deviceBlacklistDB:        newDeviceBlacklistDB(ctx),
 		friendDB:                 newFriendDB(ctx),
 		smsServie:                commonapi.NewSMSService(ctx),
 		settingDB:                NewSettingDB(ctx.DB()),
@@ -149,6 +153,7 @@ func (u *User) Route(r *wkhttp.WKHttp) {
 		user.PUT("/updatepassword", u.updatePwd)                   // 修改登录密码
 		user.POST("/web3publickey", u.uploadWeb3PublicKey)         // 上传web3公钥
 		user.POST("/quit", u.quit)                                 // 退出登录
+		user.GET("/checkstatus", u.checkStatus)                    // 启动/恢复时校验当前 uid/ip/device 是否被封禁
 		// #################### 登录设备管理 ####################
 		user.GET("/devices", u.deviceList)                 // 用户登录设备
 		user.DELETE("/devices/:device_id", u.deviceDelete) // 删除登录设备
@@ -991,8 +996,8 @@ func (u *User) login(c *wkhttp.Context) {
 
 // 验证登录用户信息
 func (u *User) execLoginAndRespose(userInfo *Model, flag config.DeviceFlag, device *deviceReq, loginSpanCtx context.Context, c *wkhttp.Context) {
-
-	result, err := u.execLogin(userInfo, flag, device, loginSpanCtx)
+	publicIP := util.GetClientPublicIP(c.Request)
+	result, err := u.execLogin(userInfo, flag, device, publicIP, loginSpanCtx)
 	if err != nil {
 		if errors.Is(err, ErrUserNeedVerification) {
 			phone := ""
@@ -1013,11 +1018,41 @@ func (u *User) execLoginAndRespose(userInfo *Model, flag config.DeviceFlag, devi
 
 	c.Response(result)
 
-	publicIP := util.GetClientPublicIP(c.Request)
 	go u.sentWelcomeMsg(publicIP, userInfo.UID)
 }
 
-func (u *User) execLogin(userInfo *Model, flag config.DeviceFlag, device *deviceReq, loginSpanCtx context.Context) (*loginUserDetailResp, error) {
+// checkLoginBlacklist 校验登录请求 IP 与设备 ID 是否在管理后台风控黑名单
+func (u *User) checkLoginBlacklist(publicIP string, device *deviceReq) error {
+	// 校验 IP 黑名单
+	if publicIP != "" {
+		banned, err := u.ipBlacklistDB.exist(publicIP)
+		if err != nil {
+			u.Error("查询 IP 黑名单失败", zap.Error(err), zap.String("ip", publicIP))
+			return errors.New("登录校验失败，请稍后重试")
+		}
+		if banned {
+			return errors.New("当前 IP 已被禁止登录，如有疑问请联系管理员")
+		}
+	}
+	// 校验设备 ID 黑名单
+	if device != nil && device.DeviceID != "" {
+		banned, err := u.deviceBlacklistDB.exist(device.DeviceID)
+		if err != nil {
+			u.Error("查询设备黑名单失败", zap.Error(err), zap.String("device_id", device.DeviceID))
+			return errors.New("登录校验失败，请稍后重试")
+		}
+		if banned {
+			return errors.New("当前设备已被禁止登录，如有疑问请联系管理员")
+		}
+	}
+	return nil
+}
+
+func (u *User) execLogin(userInfo *Model, flag config.DeviceFlag, device *deviceReq, publicIP string, loginSpanCtx context.Context) (*loginUserDetailResp, error) {
+	// 风控：先于账号状态校验做 IP / 设备黑名单拦截
+	if err := u.checkLoginBlacklist(publicIP, device); err != nil {
+		return nil, err
+	}
 	if userInfo.Status == int(common.UserDisable) {
 		return nil, errors.New("该用户已被禁用")
 	}

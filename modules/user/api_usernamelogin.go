@@ -93,7 +93,8 @@ func (u *User) usernameLogin(c *wkhttp.Context) {
 		return
 	}
 
-	result, err := u.execLogin(userInfo, config.DeviceFlag(req.Flag), req.Device, loginSpanCtx)
+	publicIP := util.GetClientPublicIP(c.Request)
+	result, err := u.execLogin(userInfo, config.DeviceFlag(req.Flag), req.Device, publicIP, loginSpanCtx)
 	if err != nil {
 		c.ResponseError(err)
 		return
@@ -106,7 +107,6 @@ func (u *User) usernameLogin(c *wkhttp.Context) {
 		"data":                      result,
 		"need_upload_web3publickey": needUploadWeb3PublicKey,
 	})
-	publicIP := util.GetClientPublicIP(c.Request)
 	go u.sentWelcomeMsg(publicIP, userInfo.UID)
 }
 func (u *User) registerWithUsername(username string, name string, password string, flag int, device *deviceReq, c *wkhttp.Context) {

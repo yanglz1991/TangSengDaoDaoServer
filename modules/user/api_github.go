@@ -71,13 +71,13 @@ func (u *User) githubOAuth(c *wkhttp.Context) {
 			c.ResponseError(errors.New("用户不存在"))
 			return
 		}
-		loginResp, err = u.execLogin(userInfoM, deviceFlag, nil, loginSpanCtx)
+		publicIP := util.GetClientPublicIP(c.Request)
+		loginResp, err = u.execLogin(userInfoM, deviceFlag, nil, publicIP, loginSpanCtx)
 		if err != nil {
 			c.ResponseError(err)
 			return
 		}
 		// 发送登录消息
-		publicIP := util.GetClientPublicIP(c.Request)
 		go u.sentWelcomeMsg(publicIP, userInfoM.UID)
 	} else {
 		// 创建用户

@@ -24,29 +24,33 @@ import (
 type Manager struct {
 	ctx *config.Context
 	log.Log
-	db            *managerDB
-	userDB        *DB
-	userSettingDB *SettingDB
-	deviceDB      *deviceDB
-	friendDB      *friendDB
-	loginLogDB    *LoginLogDB
-	onlineService IOnlineService
-	commonService common2.IService
+	db                *managerDB
+	userDB            *DB
+	userSettingDB     *SettingDB
+	deviceDB          *deviceDB
+	friendDB          *friendDB
+	loginLogDB        *LoginLogDB
+	ipBlacklistDB     *ipBlacklistDB
+	deviceBlacklistDB *deviceBlacklistDB
+	onlineService     IOnlineService
+	commonService     common2.IService
 }
 
 // NewManager NewManager
 func NewManager(ctx *config.Context) *Manager {
 	m := &Manager{
-		ctx:           ctx,
-		Log:           log.NewTLog("userManager"),
-		db:            newManagerDB(ctx),
-		deviceDB:      newDeviceDB(ctx),
-		friendDB:      newFriendDB(ctx),
-		userDB:        NewDB(ctx),
-		userSettingDB: NewSettingDB(ctx.DB()),
-		loginLogDB:    NewLoginLogDB(ctx.DB()),
-		onlineService: NewOnlineService(ctx),
-		commonService: common2.NewService(ctx),
+		ctx:               ctx,
+		Log:               log.NewTLog("userManager"),
+		db:                newManagerDB(ctx),
+		deviceDB:          newDeviceDB(ctx),
+		friendDB:          newFriendDB(ctx),
+		userDB:            NewDB(ctx),
+		userSettingDB:     NewSettingDB(ctx.DB()),
+		loginLogDB:        NewLoginLogDB(ctx.DB()),
+		ipBlacklistDB:     newIPBlacklistDB(ctx),
+		deviceBlacklistDB: newDeviceBlacklistDB(ctx),
+		onlineService:     NewOnlineService(ctx),
+		commonService:     common2.NewService(ctx),
 	}
 	m.createManagerAccount()
 	return m
@@ -74,6 +78,16 @@ func (m *Manager) Route(r *wkhttp.WKHttp) {
 		auth.PUT("/user/liftban/:uid/:status", m.liftBanUser) // 解禁或封禁用户
 		auth.POST("/user/updatepassword", m.updatePwd)        // 修改用户密码
 		auth.GET("/user/devices", m.devices)                  // 查看某用户设备列表
+
+		// 风控：IP 黑名单
+		auth.GET("/user/iplist", m.ipList)                         // IP 列表（含关联用户）
+		auth.POST("/user/ipblacklist/add", m.ipBlacklistAdd)       // 封禁 IP
+		auth.POST("/user/ipblacklist/remove", m.ipBlacklistRemove) // 解禁 IP
+
+		// 风控：设备黑名单
+		auth.GET("/user/devicelist", m.deviceList)                         // 设备列表（含关联用户）
+		auth.POST("/user/deviceblacklist/add", m.deviceBlacklistAdd)       // 封禁设备
+		auth.POST("/user/deviceblacklist/remove", m.deviceBlacklistRemove) // 解禁设备
 	}
 }
 
@@ -978,6 +992,11 @@ func (m *Manager) liftBanUser(c *wkhttp.Context) {
 		m.Error("更新WebIM的token失败！", zap.Error(err))
 		c.ResponseError(errors.New("更新IM的token失败！"))
 		return
+	}
+	// 封禁场景：先推送 forceLogout CMD 让客户端弹窗显示原因，再切断长连
+	// sendForceLogoutCMD 内部已留出 CMD 处理时间，调用返回后再 QuitUserDevice 即可
+	if userStatus == int(common.UserDisable) {
+		m.sendForceLogoutCMD([]string{userInfo.UID}, "您的账号已被管理员封禁", ForceLogoutMatchUser, userInfo.UID)
 	}
 	err = m.ctx.QuitUserDevice(userInfo.UID, -1)
 	if err != nil {

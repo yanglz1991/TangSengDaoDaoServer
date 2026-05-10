@@ -92,6 +92,137 @@ func (m *managerDB) queryUserCountWithStatus(status int) (int64, error) {
 	return count, err
 }
 
+// 查询 IP 聚合列表（按 (login_ip, uid) 去重，取最近登录时间倒序）
+// keyword 模糊匹配 IP / 用户 uid / 用户 name
+func (m *managerDB) queryIPAggList(keyword string, pageSize, page uint64) ([]*managerIPAggModel, error) {
+	var list []*managerIPAggModel
+	stmt := m.session.SelectBySql(`
+		select t.login_ip, t.uid, t.last_login_at, u.name, u.username, u.status
+		from (
+			select login_ip, uid, max(created_at) as last_login_at
+			from login_log
+			group by login_ip, uid
+		) t
+		left join user u on u.uid = t.uid
+		`+ipAggKeywordWhere(keyword)+`
+		order by t.last_login_at desc
+		limit ? offset ?
+	`, ipAggKeywordArgs(keyword, pageSize, (page-1)*pageSize)...)
+	_, err := stmt.Load(&list)
+	return list, err
+}
+
+func (m *managerDB) queryIPAggCount(keyword string) (int64, error) {
+	var count int64
+	_, err := m.session.SelectBySql(`
+		select count(*) from (
+			select login_ip, uid from login_log group by login_ip, uid
+		) t left join user u on u.uid = t.uid
+		`+ipAggKeywordWhere(keyword), ipAggKeywordArgsForCount(keyword)...).Load(&count)
+	return count, err
+}
+
+func ipAggKeywordWhere(keyword string) string {
+	if keyword == "" {
+		return ""
+	}
+	return " where (t.login_ip like ? or t.uid like ? or u.name like ?) "
+}
+
+func ipAggKeywordArgs(keyword string, limit, offset uint64) []interface{} {
+	if keyword == "" {
+		return []interface{}{limit, offset}
+	}
+	like := "%" + keyword + "%"
+	return []interface{}{like, like, like, limit, offset}
+}
+
+func ipAggKeywordArgsForCount(keyword string) []interface{} {
+	if keyword == "" {
+		return nil
+	}
+	like := "%" + keyword + "%"
+	return []interface{}{like, like, like}
+}
+
+// 查询设备列表（每个 (device_id, uid) 一行，按最后登录时间倒序）
+// keyword 模糊匹配 device_id / device_name / device_model / 用户 uid / 用户 name
+func (m *managerDB) queryDeviceAggList(keyword string, pageSize, page uint64) ([]*managerDeviceAggModel, error) {
+	var list []*managerDeviceAggModel
+	_, err := m.session.SelectBySql(`
+		select d.id, d.device_id, d.uid, d.device_name, d.device_model, d.last_login, u.name, u.username, u.status
+		from device d
+		left join user u on u.uid = d.uid
+		`+deviceAggKeywordWhere(keyword)+`
+		order by d.last_login desc
+		limit ? offset ?
+	`, deviceAggKeywordArgs(keyword, pageSize, (page-1)*pageSize)...).Load(&list)
+	return list, err
+}
+
+func (m *managerDB) queryDeviceAggCount(keyword string) (int64, error) {
+	var count int64
+	_, err := m.session.SelectBySql(`
+		select count(*) from device d left join user u on u.uid = d.uid
+		`+deviceAggKeywordWhere(keyword), deviceAggKeywordArgsForCount(keyword)...).Load(&count)
+	return count, err
+}
+
+func deviceAggKeywordWhere(keyword string) string {
+	if keyword == "" {
+		return ""
+	}
+	return " where (d.device_id like ? or d.device_name like ? or d.device_model like ? or d.uid like ? or u.name like ?) "
+}
+
+func deviceAggKeywordArgs(keyword string, limit, offset uint64) []interface{} {
+	if keyword == "" {
+		return []interface{}{limit, offset}
+	}
+	like := "%" + keyword + "%"
+	return []interface{}{like, like, like, like, like, limit, offset}
+}
+
+func deviceAggKeywordArgsForCount(keyword string) []interface{} {
+	if keyword == "" {
+		return nil
+	}
+	like := "%" + keyword + "%"
+	return []interface{}{like, like, like, like, like}
+}
+
+// queryOnlineUIDsByLastLoginIP 查询「当前在线 且 最近一次登录 IP == ip」的 uid 集合
+// 用于 IP 黑名单封禁时，推送 forceLogout CMD 给可能正在使用此 IP 的在线用户
+// 近似实现：实际客户端切网后 publicIP 变化但 IM 长连仍存活时会漏踢；不会误踢他人
+func (m *managerDB) queryOnlineUIDsByLastLoginIP(ip string) ([]string, error) {
+	if ip == "" {
+		return nil, nil
+	}
+	var uids []string
+	_, err := m.session.SelectBySql(`
+		select uo.uid
+		from user_online uo
+		join (
+			select uid, login_ip
+			from login_log
+			where (uid, created_at) in (select uid, max(created_at) from login_log group by uid)
+		) ll on ll.uid = uo.uid
+		where uo.online = 1 and ll.login_ip = ?
+		group by uo.uid
+	`, ip).Load(&uids)
+	return uids, err
+}
+
+// queryUIDsByDeviceID 查询此 device_id 关联的所有 uid
+func (m *managerDB) queryUIDsByDeviceID(deviceID string) ([]string, error) {
+	if deviceID == "" {
+		return nil, nil
+	}
+	var uids []string
+	_, err := m.session.Select("uid").From("device").Where("device_id=?", deviceID).GroupBy("uid").Load(&uids)
+	return uids, err
+}
+
 func (m *managerDB) queryUserOnline(uid string) ([]*userOnline, error) {
 	var list []*userOnline
 	_, err := m.session.Select("*").From("user_online").Where("uid=?", uid).Load(&list)
@@ -141,6 +272,29 @@ type managerUserBlacklistModel struct {
 	Name string
 	UID  string
 	db.BaseModel
+}
+
+// managerIPAggModel IP 聚合视图：(login_ip, uid) 唯一
+type managerIPAggModel struct {
+	LoginIP     string       `db:"login_ip"`
+	UID         string       `db:"uid"`
+	LastLoginAt dbr.NullTime `db:"last_login_at"`
+	Name        string       `db:"name"`
+	Username    string       `db:"username"`
+	Status      int          `db:"status"`
+}
+
+// managerDeviceAggModel 设备列表视图：(device_id, uid) 唯一
+type managerDeviceAggModel struct {
+	Id          int64  `db:"id"`
+	DeviceID    string `db:"device_id"`
+	UID         string `db:"uid"`
+	DeviceName  string `db:"device_name"`
+	DeviceModel string `db:"device_model"`
+	LastLogin   int64  `db:"last_login"`
+	Name        string `db:"name"`
+	Username    string `db:"username"`
+	Status      int    `db:"status"`
 }
 
 type userOnline struct {
