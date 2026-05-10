@@ -336,6 +336,10 @@ func (cn *Common) appConfig(c *wkhttp.Context) {
 		InviteSystemAccountJoinGroupOn: appConfigM.InviteSystemAccountJoinGroupOn,
 		RegisterUserMustCompleteInfoOn: appConfigM.RegisterUserMustCompleteInfoOn,
 		CanModifyApiUrl:                appConfigM.CanModifyApiUrl,
+		DisableGroupMessageOn:          appConfigM.DisableGroupMessageOn,
+		DisablePrivateMessageOn:        appConfigM.DisablePrivateMessageOn,
+		MuteTextOfGroup:                appConfigM.MuteTextOfGroup,
+		MuteTextOfPrivate:              appConfigM.MuteTextOfPrivate,
 	})
 }
 
@@ -496,6 +500,10 @@ type appConfigResp struct {
 	InviteSystemAccountJoinGroupOn int    `json:"invite_system_account_join_group_on"` // 开启系统账号加入群聊
 	RegisterUserMustCompleteInfoOn int    `json:"register_user_must_complete_info_on"` // 注册用户必须填写完整信息
 	CanModifyApiUrl                int    `json:"can_modify_api_url"`                  // 允许修改api地址
+	DisableGroupMessageOn          int    `json:"disable_group_message_on"`            // 群聊禁言开关（含群发消息/建群/加群成员/加好友）
+	DisablePrivateMessageOn        int    `json:"disable_private_message_on"`          // 私聊禁言开关
+	MuteTextOfGroup                string `json:"mute_text_of_group"`                  // 群聊禁言客户端展示文案
+	MuteTextOfPrivate              string `json:"mute_text_of_private"`                // 私聊禁言客户端展示文案
 }
 
 type appVersionReq struct {

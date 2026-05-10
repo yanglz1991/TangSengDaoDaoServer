@@ -3,12 +3,17 @@ package common
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/log"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhttp"
 	"go.uber.org/zap"
 )
+
+// CMDAppConfigUpdate 当管理后台修改 app 全局配置（如禁言开关）时下发的 CMD
+// 客户端收到后立即重新拉取 /v1/common/appconfig，避免轮询延迟
+const CMDAppConfigUpdate = "appconfigUpdate"
 
 // Manager 通用后台管理api
 type Manager struct {
@@ -206,6 +211,10 @@ func (m *Manager) updateConfig(c *wkhttp.Context) {
 		RegisterUserMustCompleteInfoOn int    `json:"register_user_must_complete_info_on"` // 注册用户必须填写完整信息
 		ChannelPinnedMessageMaxCount   int    `json:"channel_pinned_message_max_count"`    // 频道置顶消息最大数量
 		CanModifyApiUrl                int    `json:"can_modify_api_url"`                  // 是否可以修改api地址
+		DisableGroupMessageOn          int    `json:"disable_group_message_on"`            // 群聊禁言开关
+		DisablePrivateMessageOn        int    `json:"disable_private_message_on"`          // 私聊禁言开关
+		MuteTextOfGroup                string `json:"mute_text_of_group"`                  // 群聊禁言文案
+		MuteTextOfPrivate              string `json:"mute_text_of_private"`                // 私聊禁言文案
 	}
 	var req reqVO
 	if err := c.BindJSON(&req); err != nil {
@@ -229,13 +238,62 @@ func (m *Manager) updateConfig(c *wkhttp.Context) {
 	configMap["register_user_must_complete_info_on"] = req.RegisterUserMustCompleteInfoOn
 	configMap["channel_pinned_message_max_count"] = req.ChannelPinnedMessageMaxCount
 	configMap["can_modify_api_url"] = req.CanModifyApiUrl
+	configMap["disable_group_message_on"] = req.DisableGroupMessageOn
+	configMap["disable_private_message_on"] = req.DisablePrivateMessageOn
+	configMap["mute_text_of_group"] = req.MuteTextOfGroup
+	configMap["mute_text_of_private"] = req.MuteTextOfPrivate
 	err = m.appconfigDB.updateWithMap(configMap, appConfigM.Id)
 	if err != nil {
 		m.Error("修改app配置信息错误", zap.Error(err))
 		c.ResponseError(errors.New("修改app配置信息错误"))
 		return
 	}
+	// 异步广播 CMD：让所有在线客户端立即重新拉取最新配置（无需等待轮询）
+	go m.broadcastAppConfigUpdate()
 	c.ResponseOK()
+}
+
+// broadcastAppConfigUpdate 给所有用户分批下发 appconfigUpdate CMD
+// 客户端收到该 CMD 后会重新拉取 /v1/common/appconfig 同步最新值
+func (m *Manager) broadcastAppConfigUpdate() {
+	type uidRow struct {
+		UID string `db:"uid"`
+	}
+	var rows []*uidRow
+	_, err := m.ctx.DB().Select("uid").From("user").Where("is_destroy=0 and bench_no=''").Load(&rows)
+	if err != nil {
+		m.Error("broadcastAppConfigUpdate: 查询用户列表失败", zap.Error(err))
+		return
+	}
+	if len(rows) == 0 {
+		return
+	}
+	const batchSize = 1000
+	batch := make([]string, 0, batchSize)
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		err := m.ctx.SendCMD(config.MsgCMDReq{
+			NoPersist:   true,
+			Subscribers: batch,
+			CMD:         CMDAppConfigUpdate,
+		})
+		if err != nil {
+			m.Error("broadcastAppConfigUpdate: 发送 CMD 失败", zap.Error(err))
+		}
+		batch = batch[:0]
+	}
+	for i, r := range rows {
+		batch = append(batch, r.UID)
+		if len(batch) >= batchSize {
+			flush()
+			// 分批之间休眠，避免压力过大
+			time.Sleep(time.Second)
+		}
+		_ = i
+	}
+	flush()
 }
 func (m *Manager) appconfig(c *wkhttp.Context) {
 	err := c.CheckLoginRole()
@@ -259,6 +317,10 @@ func (m *Manager) appconfig(c *wkhttp.Context) {
 	var registerUserMustCompleteInfoOn = 0
 	var channelPinnedMessageMaxCount = 10
 	var canModifyApiUrl = 0
+	var disableGroupMessageOn = 0
+	var disablePrivateMessageOn = 0
+	var muteTextOfGroup = ""
+	var muteTextOfPrivate = ""
 	if appconfig != nil {
 		revokeSecond = appconfig.RevokeSecond
 		welcomeMessage = appconfig.WelcomeMessage
@@ -270,6 +332,10 @@ func (m *Manager) appconfig(c *wkhttp.Context) {
 		registerUserMustCompleteInfoOn = appconfig.RegisterUserMustCompleteInfoOn
 		channelPinnedMessageMaxCount = appconfig.ChannelPinnedMessageMaxCount
 		canModifyApiUrl = appconfig.CanModifyApiUrl
+		disableGroupMessageOn = appconfig.DisableGroupMessageOn
+		disablePrivateMessageOn = appconfig.DisablePrivateMessageOn
+		muteTextOfGroup = appconfig.MuteTextOfGroup
+		muteTextOfPrivate = appconfig.MuteTextOfPrivate
 	}
 	if revokeSecond == 0 {
 		revokeSecond = 120
@@ -288,6 +354,10 @@ func (m *Manager) appconfig(c *wkhttp.Context) {
 		RegisterUserMustCompleteInfoOn: registerUserMustCompleteInfoOn,
 		ChannelPinnedMessageMaxCount:   channelPinnedMessageMaxCount,
 		CanModifyApiUrl:                canModifyApiUrl,
+		DisableGroupMessageOn:          disableGroupMessageOn,
+		DisablePrivateMessageOn:        disablePrivateMessageOn,
+		MuteTextOfGroup:                muteTextOfGroup,
+		MuteTextOfPrivate:              muteTextOfPrivate,
 	})
 }
 
@@ -302,6 +372,10 @@ type managerAppConfigResp struct {
 	RegisterUserMustCompleteInfoOn int    `json:"register_user_must_complete_info_on"` // 注册用户必须填写完整信息
 	ChannelPinnedMessageMaxCount   int    `json:"channel_pinned_message_max_count"`    // 频道置顶消息最大数量
 	CanModifyApiUrl                int    `json:"can_modify_api_url"`                  // 是否可以修改api地址
+	DisableGroupMessageOn          int    `json:"disable_group_message_on"`            // 群聊禁言开关
+	DisablePrivateMessageOn        int    `json:"disable_private_message_on"`          // 私聊禁言开关
+	MuteTextOfGroup                string `json:"mute_text_of_group"`                  // 群聊禁言文案
+	MuteTextOfPrivate              string `json:"mute_text_of_private"`                // 私聊禁言文案
 }
 
 type managerAppModule struct {

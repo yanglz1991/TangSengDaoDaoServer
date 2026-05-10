@@ -51,5 +51,9 @@ type appConfigModel struct {
 	RegisterUserMustCompleteInfoOn int    // 注册用户是否必须完善个人信息
 	ChannelPinnedMessageMaxCount   int    // 频道置顶消息最大数量
 	CanModifyApiUrl                int    // 是否可以修改API地址
+	DisableGroupMessageOn          int    // 是否开启群聊禁言（含群发消息/建群/加群成员/加好友）
+	DisablePrivateMessageOn        int    // 是否开启私聊禁言（禁止私聊发消息）
+	MuteTextOfGroup                string // 群聊禁言客户端展示文案
+	MuteTextOfPrivate              string // 私聊禁言客户端展示文案
 	ldb.BaseModel
 }
