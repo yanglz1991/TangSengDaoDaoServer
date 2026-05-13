@@ -105,6 +105,22 @@
         $("#ok").addClass('disabled').off('click');
     }
 
+    // 关闭/退出当前页面：
+    // - 原生 WebView（iOS/Android）：调用 IMJSBridge 的 quit -> 由 native pop webview
+    // - 普通浏览器：直接 window.close() 关闭由 window.open 打开的 tab；如被禁则跳转 about:blank 兜底
+    function closeAfterAction() {
+        if (window.IMJSBridge) {
+            im.quit();
+            return;
+        }
+        try { window.close(); } catch (e) { }
+        setTimeout(function () {
+            if (!window.closed) {
+                window.location.href = 'about:blank';
+            }
+        }, 100);
+    }
+
     $(function () {
         im.onReady();
 
@@ -134,19 +150,19 @@
                 $("#ok").click(function () {
                     disableActions();
                     $.postJSON(`${apiURL}group/invite/sure?auth_code=${code}`).then(function (resp) {
-                        im.quit();
+                        closeAfterAction();
                     }).fail(function (e) {
                         $("#refuse").removeClass('disabled');
                         $("#ok").removeClass('disabled');
                     })
                 });
                 $("#refuse").click(function () {
-                    if (!confirm('确定拒绝此邀请吗？')) {
-                        return;
-                    }
+                    // 注：原本使用 window.confirm 二次确认，但 iOS WKWebView 默认未实现
+                    // runJavaScriptConfirmPanelWithMessage，confirm 直接返回 false 会导致拒绝按钮无反应；
+                    // 这里直接执行拒绝并退出页面，避免端上行为不一致。
                     disableActions();
                     $.postJSON(`${apiURL}group/invite/refuse?auth_code=${code}`).then(function (resp) {
-                        im.quit();
+                        closeAfterAction();
                     }).fail(function (e) {
                         $("#refuse").removeClass('disabled');
                         $("#ok").removeClass('disabled');
