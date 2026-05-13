@@ -33,6 +33,23 @@ func (d *DB) QueryInviteItemDetail(inviteNo string) ([]*InviteItemDetailModel, e
 
 }
 
+// QueryInviteDetailsWithGroupNoAndStatus 按群和状态查询邀请详情列表
+func (d *DB) QueryInviteDetailsWithGroupNoAndStatus(groupNo string, status int) ([]*InviteDetailModel, error) {
+	var models []*InviteDetailModel
+	_, err := d.session.Select("group_invite.*,IFNULL(user.name,'') inviter_name").From("group_invite").LeftJoin("user", "group_invite.inviter=user.uid").Where("group_invite.group_no=? and group_invite.status=?", groupNo, status).OrderBy("group_invite.created_at desc").Load(&models)
+	return models, err
+}
+
+// QueryInviteItemsWithInviteNos 按 invite_no 批量查询邀请项详情
+func (d *DB) QueryInviteItemsWithInviteNos(inviteNos []string) ([]*InviteItemDetailModel, error) {
+	if len(inviteNos) == 0 {
+		return nil, nil
+	}
+	var items []*InviteItemDetailModel
+	_, err := d.session.Select("invite_item.*,IFNULL(user.name,'') name").From("invite_item").LeftJoin("user", "invite_item.uid=user.uid").Where("invite_item.invite_no in ?", inviteNos).Load(&items)
+	return items, err
+}
+
 // UpdateInviteStatusTx 更新邀请信息状态
 func (d *DB) UpdateInviteStatusTx(allower string, status int, inviteNo string, tx *dbr.Tx) error {
 	_, err := tx.Update("group_invite").Set("allower", allower).Set("status", status).Where("invite_no=?", inviteNo).Exec()
@@ -51,7 +68,7 @@ type InviteModel struct {
 	GroupNo  string `json:"group_no"`  // 群唯一编号
 	Inviter  string `json:"inviter"`   // 邀请者
 	Remark   string `json:"remark"`    // 邀请备注
-	Status   int    `json:"status"`    // 状态 0.未确认 1.已确认
+	Status   int    `json:"status"`    // 状态 0.待审核 1.已通过 2.已拒绝
 	Allower  string `json:"allower"`   // 确认者
 	db.BaseModel
 }
@@ -75,6 +92,6 @@ type InviteItemModel struct {
 	GroupNo  string `json:"group_no"`  // 群唯一编号
 	Inviter  string `json:"inviter"`   // 邀请者
 	UID      string `json:"uid"`       // 被邀请uid
-	Status   int    `json:"status"`    // 状态 0.未确认 1.已确认
+	Status   int    `json:"status"`    // 状态 0.待审核 1.已通过 2.已拒绝
 	db.BaseModel
 }

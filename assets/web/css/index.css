@@ -17,3 +17,14 @@ body {
     background-color: #2F70F5;
     color: white;
 }
+
+.danger {
+    background-color: #F56C6C;
+    color: white;
+}
+
+.disabled {
+    background-color: #cccccc;
+    color: #ffffff;
+    cursor: not-allowed;
+}

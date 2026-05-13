@@ -132,7 +132,20 @@ im.getChannel = function () {
 
 // 退出webview
 im.quit = function () {
-    im.call("quit");
+    if (window.IMJSBridge) {
+        im.call("quit");
+    } else {
+        // web端：关闭当前页面
+        try {
+            window.close();
+        } catch (e) { }
+        // 部分浏览器禁止脚本关闭非脚本打开的窗口，做兜底跳转
+        setTimeout(function () {
+            if (!window.closed) {
+                window.location.href = "about:blank";
+            }
+        }, 100);
+    }
 }
 
 

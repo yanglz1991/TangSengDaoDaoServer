@@ -91,6 +91,7 @@ func (g *Group) Route(r *wkhttp.WKHttp) {
 		groups.POST("/:group_no/transfer/:to_uid", g.transferGrouper)                      // 群主转让
 		groups.POST("/:group_no/member/invite", g.groupMemberInviteAdd)                    // 群成员邀请
 		groups.GET("/:group_no/member/h5confirm", g.getToGroupMemberConfirmInviteDetailH5) // 获取确认邀请的h5页面
+		groups.GET("/:group_no/member/invites", g.groupMemberInviteList)                   // 群待审核邀请列表（仅群主或管理员）
 		groups.POST("/:group_no/blacklist/:action", g.blacklist)                           // 添加或移除黑名单
 		groups.POST("/:group_no/forbidden_with_member", g.forbiddenWithGroupMember)        // 禁言或解禁某个群成员
 		groups.POST("/:group_no/avatar", g.avatarUpload)                                   // 上传群头像
@@ -107,6 +108,7 @@ func (g *Group) Route(r *wkhttp.WKHttp) {
 
 		openGroup.GET("invites/:invite_no", g.groupMemberInviteDetail) // 获取邀请详情
 		openGroup.POST("invite/sure", g.groupMemberInviteSure)         // 确认邀请
+		openGroup.POST("invite/refuse", g.groupMemberInviteRefuse)     // 拒绝邀请
 	}
 	go g.CheckForbiddenLoop()
 }

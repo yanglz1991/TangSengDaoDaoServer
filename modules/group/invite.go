@@ -304,23 +304,154 @@ func (g *Group) groupMemberInviteDetail(c *wkhttp.Context) {
 		c.ResponseError(errors.New("获取邀请项失败！"))
 		return
 	}
-	var uids = make([]string, 0, len(inviteItems))
-	for _, item := range inviteItems {
-		uids = append(uids, item.UID)
-	}
-	// 查询被邀请的成员
-	members, err := g.db.QueryMembersWithUids(uids, inviteDetilModel.GroupNo)
-	if err != nil {
-		g.Error("查询成员信息错误", zap.Error(err))
-		c.ResponseError(errors.New("查询成员信息错误"))
-		return
-	}
-	if len(members) == len(inviteItems) {
-		inviteDetilModel.Status = 1
+	// 邀请仍处于待确认状态时，若被邀请的人全部已通过其他渠道进入群聊，对外展示为已确认
+	if inviteDetilModel.Status == InviteStatusWait {
+		var uids = make([]string, 0, len(inviteItems))
+		for _, item := range inviteItems {
+			uids = append(uids, item.UID)
+		}
+		members, err := g.db.QueryMembersWithUids(uids, inviteDetilModel.GroupNo)
+		if err != nil {
+			g.Error("查询成员信息错误", zap.Error(err))
+			c.ResponseError(errors.New("查询成员信息错误"))
+			return
+		}
+		if len(inviteItems) > 0 && len(members) == len(inviteItems) {
+			inviteDetilModel.Status = InviteStatusOK
+		}
 	}
 
 	g.Debug("inviteItems-", zap.Int("len", len(inviteItems)))
 	c.Response(InviteDetailResp{}.From(inviteDetilModel, inviteItems))
+}
+
+// groupMemberInviteRefuse 拒绝群成员邀请
+func (g *Group) groupMemberInviteRefuse(c *wkhttp.Context) {
+	authCode := c.Query("auth_code")
+	authInfo, err := g.ctx.GetRedisConn().GetString(fmt.Sprintf("%s%s", common.AuthCodeCachePrefix, authCode))
+	if err != nil {
+		g.Error("获取授权信息失败！", zap.Error(err))
+		c.ResponseError(errors.New("获取授权信息失败！"))
+		return
+	}
+	if authInfo == "" {
+		c.ResponseError(errors.New("授权信息不存在或已失效！"))
+		return
+	}
+	var authMap map[string]interface{}
+	err = util.ReadJsonByByte([]byte(authInfo), &authMap)
+	if err != nil {
+		g.Error("解码认证信息的JSON数据失败！", zap.Error(err))
+		c.ResponseError(errors.New("解码认证信息的JSON数据失败！"))
+		return
+	}
+	authType := authMap["type"].(string)
+	if authType != string(common.AuthCodeTypeGroupMemberInvite) {
+		c.ResponseError(errors.New("授权码不是确认邀请！"))
+		return
+	}
+	inviteNo := authMap["invite_no"].(string)
+	inviteDetailModel, err := g.db.QueryInviteDetail(inviteNo)
+	if err != nil {
+		g.Error("查询邀请详情失败！", zap.Error(err))
+		c.ResponseError(errors.New("查询邀请详情失败！"))
+		return
+	}
+	if inviteDetailModel == nil {
+		c.ResponseError(errors.New("没有查询到邀请信息！"))
+		return
+	}
+	if inviteDetailModel.Status != InviteStatusWait {
+		c.ResponseError(errors.New("邀请信息不是待审核状态！"))
+		return
+	}
+	allower := authMap["allower"].(string)
+	tx, err := g.ctx.DB().Begin()
+	if err != nil {
+		g.Error("开启事务失败！", zap.Error(err))
+		c.ResponseError(errors.New("开启事务失败！"))
+		return
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			tx.Rollback()
+			panic(err)
+		}
+	}()
+	err = g.db.UpdateInviteStatusTx(allower, InviteStatusRefuse, inviteNo, tx)
+	if err != nil {
+		tx.Rollback()
+		g.Error("更新邀请信息状态失败！", zap.Error(err))
+		c.ResponseError(errors.New("更新邀请信息状态失败！"))
+		return
+	}
+	err = g.db.UpdateInviteItemStatusTx(InviteStatusRefuse, inviteNo, tx)
+	if err != nil {
+		tx.Rollback()
+		g.Error("更新邀请信息项状态失败！", zap.Error(err))
+		c.ResponseError(errors.New("更新邀请信息项状态失败！"))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		tx.Rollback()
+		g.Error("提交事务失败！", zap.Error(err))
+		c.ResponseError(errors.New("提交事务失败！"))
+		return
+	}
+	c.ResponseOK()
+}
+
+// groupMemberInviteList 获取群待审批邀请列表（仅群主或管理员）
+func (g *Group) groupMemberInviteList(c *wkhttp.Context) {
+	groupNo := c.Param("group_no")
+	loginUID := c.MustGet("uid").(string)
+	if groupNo == "" {
+		c.ResponseError(errors.New("群编号不能为空"))
+		return
+	}
+	_, err := g.getGroupInfo(groupNo)
+	if err != nil {
+		c.ResponseError(err)
+		return
+	}
+	managerOrCreator, err := g.db.QueryIsGroupManagerOrCreator(groupNo, loginUID)
+	if err != nil {
+		g.Error("查询是否是管理者或创建者失败！", zap.Error(err))
+		c.ResponseError(errors.New("查询是否是管理者或创建者失败！"))
+		return
+	}
+	if !managerOrCreator {
+		c.ResponseError(errors.New("你不是群主或管理员！"))
+		return
+	}
+
+	models, err := g.db.QueryInviteDetailsWithGroupNoAndStatus(groupNo, InviteStatusWait)
+	if err != nil {
+		g.Error("查询邀请列表失败！", zap.Error(err))
+		c.ResponseError(errors.New("查询邀请列表失败！"))
+		return
+	}
+	resps := make([]InviteDetailResp, 0, len(models))
+	if len(models) > 0 {
+		inviteNos := make([]string, 0, len(models))
+		for _, m := range models {
+			inviteNos = append(inviteNos, m.InviteNo)
+		}
+		items, err := g.db.QueryInviteItemsWithInviteNos(inviteNos)
+		if err != nil {
+			g.Error("查询邀请项失败！", zap.Error(err))
+			c.ResponseError(errors.New("查询邀请项失败！"))
+			return
+		}
+		itemMap := make(map[string][]*InviteItemDetailModel, len(models))
+		for _, item := range items {
+			itemMap[item.InviteNo] = append(itemMap[item.InviteNo], item)
+		}
+		for _, m := range models {
+			resps = append(resps, InviteDetailResp{}.From(m, itemMap[m.InviteNo]))
+		}
+	}
+	c.Response(resps)
 }
 
 // InviteReq 群邀请
@@ -344,7 +475,8 @@ type InviteDetailResp struct {
 	Inviter     string                 `json:"inviter"`      // 邀请者
 	Remark      string                 `json:"remark"`       // 邀请备注
 	InviterName string                 `json:"inviter_name"` // 邀请者名称
-	Status      int                    `json:"status"`       // 状态 0.未确认 1.已确认
+	Status      int                    `json:"status"`       // 状态 0.待审核 1.已通过 2.已拒绝
+	CreatedAt   string                 `json:"created_at"`   // 创建时间
 	Items       []InviteItemDetailResp `json:"items"`        // 邀请项详情
 }
 
@@ -357,6 +489,7 @@ func (i InviteDetailResp) From(model *InviteDetailModel, items []*InviteItemDeta
 	resp.Remark = model.Remark
 	resp.InviterName = model.InviterName
 	resp.Status = model.Status
+	resp.CreatedAt = model.CreatedAt.String()
 	if len(items) > 0 {
 		itemResps := make([]InviteItemDetailResp, 0, len(items))
 		for _, item := range items {

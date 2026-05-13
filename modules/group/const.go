@@ -25,6 +25,8 @@ const (
 	InviteStatusWait = 0
 	// InviteStatusOK 已确认
 	InviteStatusOK = 1
+	// InviteStatusRefuse 已拒绝
+	InviteStatusRefuse = 2
 )
 
 // 群类型

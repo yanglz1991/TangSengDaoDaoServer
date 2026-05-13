@@ -88,13 +88,23 @@
         <div class="bottom">
             <div class="members">
             </div>
-            <div id="ok" class="button primary" style="margin: 40px 20px 20px 20px;">确认邀请</div>
+            <div id="status" style="text-align: center; margin: 30px 20px 0px 20px; color: gray;"></div>
+            <div id="actions" style="display: flex; margin: 30px 20px 20px 20px;">
+                <div id="refuse" class="button danger" style="flex: 1; margin-right: 10px;">拒绝</div>
+                <div id="ok" class="button primary" style="flex: 1; margin-left: 10px;">同意</div>
+            </div>
         </div>
     </div>
 </body>
 <script language="javascript">
     let inviteNo = getQueryString('invite_no');
     let code = getQueryString('auth_code');
+
+    function disableActions() {
+        $("#refuse").addClass('disabled').off('click');
+        $("#ok").addClass('disabled').off('click');
+    }
+
     $(function () {
         im.onReady();
 
@@ -115,15 +125,32 @@
                 $('.members').append(memberElem);
             }
             if (data.status == 1) {
-                $("#ok").text('已确认');
+                $("#status").text('已通过此邀请');
+                $("#actions").hide();
+            } else if (data.status == 2) {
+                $("#status").text('已拒绝此邀请');
+                $("#actions").hide();
             } else {
                 $("#ok").click(function () {
+                    disableActions();
                     $.postJSON(`${apiURL}group/invite/sure?auth_code=${code}`).then(function (resp) {
-                         im.quit();
+                        im.quit();
                     }).fail(function (e) {
-
+                        $("#refuse").removeClass('disabled');
+                        $("#ok").removeClass('disabled');
                     })
-
+                });
+                $("#refuse").click(function () {
+                    if (!confirm('确定拒绝此邀请吗？')) {
+                        return;
+                    }
+                    disableActions();
+                    $.postJSON(`${apiURL}group/invite/refuse?auth_code=${code}`).then(function (resp) {
+                        im.quit();
+                    }).fail(function (e) {
+                        $("#refuse").removeClass('disabled');
+                        $("#ok").removeClass('disabled');
+                    })
                 });
             }
 
