@@ -936,24 +936,25 @@ func (m *Manager) list(c *wkhttp.Context) {
 			}
 			showPhone := getShowPhoneNum(user.Phone)
 			result = append(result, &managerUserResp{
-				UID:            user.UID,
-				Username:       user.Username,
-				Name:           user.Name,
-				Phone:          showPhone,
-				Sex:            user.Sex,
-				ShortNo:        user.ShortNo,
-				LastLoginTime:  lastLoginTime,
-				LastLoginIP:    lastLoginIP,
-				DeviceName:     deviceName,
-				DeviceModel:    deviceModel,
-				Online:         online,
-				LastOnlineTime: lastOnlineTime,
-				RegisterTime:   user.CreatedAt.String(),
-				Status:         user.Status,
-				IsDestroy:      user.IsDestroy,
-				GiteeUID:       user.GiteeUID,
-				GithubUID:      user.GithubUID,
-				WXOpenid:       user.WXOpenid,
+				UID:                    user.UID,
+				Username:               user.Username,
+				Name:                   user.Name,
+				Phone:                  showPhone,
+				Sex:                    user.Sex,
+				ShortNo:                user.ShortNo,
+				LastLoginTime:          lastLoginTime,
+				LastLoginIP:            lastLoginIP,
+				DeviceName:             deviceName,
+				DeviceModel:            deviceModel,
+				Online:                 online,
+				LastOnlineTime:         lastOnlineTime,
+				RegisterTime:           user.CreatedAt.String(),
+				Status:                 user.Status,
+				IsDestroy:              user.IsDestroy,
+				GiteeUID:               user.GiteeUID,
+				GithubUID:              user.GithubUID,
+				WXOpenid:               user.WXOpenid,
+				CanInviteOrCreateGroup: user.CanInviteOrCreateGroup,
 			})
 			i++
 		}
@@ -1488,6 +1489,8 @@ type managerUserResp struct {
 	WXOpenid       string `json:"wx_openid"`  // 微信openid
 	GiteeUID       string `json:"gitee_uid"`  // gitee uid
 	GithubUID      string `json:"github_uid"` // github uid
+	// 是否允许主动加好友/创建群聊 0.否 1.是。前端列表行据此显示开关。
+	CanInviteOrCreateGroup int `json:"can_invite_or_create_group"`
 }
 
 type managerFriendResp struct {

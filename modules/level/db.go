@@ -188,6 +188,20 @@ func (d *levelDB) updateUserCanInviteOrCreateGroup(uid string, can int) error {
 	return err
 }
 
+// 批量更新某层级下所有非管理员用户的「加好友/建群」权限。
+// 不影响 admin / superAdmin（这些角色服务端始终不受该字段约束，但仍按要求保持其字段值不变）。
+// 返回受影响的行数。
+func (d *levelDB) updateNodeUsersCanInviteOrCreateGroup(nodeNo string, can int) (int64, error) {
+	res, err := d.session.Update("user").
+		Set("can_invite_or_create_group", can).
+		Where("level_node_no=?", nodeNo).
+		Exec()
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // ---------- friend 操作（仅 level 模块自用，避免依赖 user 包私有符号） ----------
 
 // 友好关系是否存在

@@ -32,15 +32,17 @@ func NewAPI(ctx *config.Context) *API {
 func (a *API) Route(r *wkhttp.WKHttp) {
 	auth := r.Group("/v1/manager/level", a.ctx.AuthMiddleware(r))
 	{
-		auth.GET("/tree", a.tree)                            // 层级树
-		auth.GET("/node/:node_no", a.nodeDetail)             // 层级详情
-		auth.POST("/node", a.createNode)                     // 创建层级
-		auth.PUT("/node/:node_no", a.updateNode)             // 修改层级
-		auth.DELETE("/node/:node_no", a.deleteNode)          // 删除层级
-		auth.GET("/node/:node_no/users", a.listUsers)        // 层级下用户列表
-		auth.GET("/users/search", a.searchUsersAPI)          // 搜索用户（用于负责人/默认好友选择）
-		auth.PUT("/user/permission", a.updateUserPermission) // 切换用户加人/建群权限
-		auth.PUT("/user/move", a.moveUser)                   // 移动用户到指定层级
+		auth.GET("/tree", a.tree)                                     // 层级树
+		auth.GET("/node/:node_no", a.nodeDetail)                      // 层级详情
+		auth.POST("/node", a.createNode)                              // 创建层级
+		auth.PUT("/node/:node_no", a.updateNode)                      // 修改层级
+		auth.DELETE("/node/:node_no", a.deleteNode)                   // 删除层级
+		auth.GET("/node/:node_no/users", a.listUsers)                 // 层级下用户列表
+		auth.GET("/users/search", a.searchUsersAPI)                   // 搜索用户（用于负责人/默认好友选择）
+		auth.PUT("/user/permission", a.updateUserPermission)          // 切换用户加人/建群权限
+		auth.PUT("/node/:node_no/permission", a.updateNodePermission) // 整个层级一键切换加人/建群权限
+		auth.PUT("/user/move", a.moveUser)                            // 移动用户到指定层级（或添加到层级）
+		auth.PUT("/user/remove", a.removeUser)                        // 把用户移出当前层级（同时解除该层级默认好友）
 	}
 }
 
@@ -388,6 +390,50 @@ func (a *API) searchUsersAPI(c *wkhttp.Context) {
 	c.Response(list)
 }
 
+// 整个层级一键切换：把指定层级下所有用户的加人/建群权限统一设为 0/1
+func (a *API) updateNodePermission(c *wkhttp.Context) {
+	if err := c.CheckLoginRole(); err != nil {
+		c.ResponseError(err)
+		return
+	}
+	nodeNo := c.Param("node_no")
+	if strings.TrimSpace(nodeNo) == "" {
+		c.ResponseError(errors.New("层级编号不能为空"))
+		return
+	}
+	var req struct {
+		CanInviteOrCreateGroup int `json:"can_invite_or_create_group"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.ResponseError(errors.New("请求数据格式有误"))
+		return
+	}
+	val := 0
+	if req.CanInviteOrCreateGroup == 1 {
+		val = 1
+	}
+	// 校验层级存在
+	n, err := a.db.queryNode(nodeNo)
+	if err != nil {
+		a.Error("查询层级失败", zap.Error(err))
+		c.ResponseError(errors.New("查询层级失败"))
+		return
+	}
+	if n == nil {
+		c.ResponseError(errors.New("层级不存在"))
+		return
+	}
+	affected, err := a.db.updateNodeUsersCanInviteOrCreateGroup(nodeNo, val)
+	if err != nil {
+		a.Error("批量更新层级用户权限失败", zap.Error(err))
+		c.ResponseError(errors.New("批量更新层级用户权限失败"))
+		return
+	}
+	c.Response(map[string]interface{}{
+		"affected": affected,
+	})
+}
+
 // 切换用户加人/建群权限
 func (a *API) updateUserPermission(c *wkhttp.Context) {
 	if err := c.CheckLoginRole(); err != nil {
@@ -427,6 +473,9 @@ func (a *API) moveUser(c *wkhttp.Context) {
 	var req struct {
 		UID    string `json:"uid"`
 		NodeNo string `json:"node_no"`
+		// 可选：传则一并设置目标层级下的加人/建群权限（0/1）。
+		// 用于「添加成员」时显式指定新成员的初始权限；不传则保留用户原有权限值。
+		CanInviteOrCreateGroup *int `json:"can_invite_or_create_group,omitempty"`
 	}
 	if err := c.BindJSON(&req); err != nil {
 		c.ResponseError(errors.New("请求数据格式有误"))
@@ -459,7 +508,20 @@ func (a *API) moveUser(c *wkhttp.Context) {
 		c.ResponseError(errors.New("用户不存在"))
 		return
 	}
+	// 规整一下传入的权限值（容错：除 1 以外都按 0 处理）
+	permVal := 0
+	if req.CanInviteOrCreateGroup != nil && *req.CanInviteOrCreateGroup == 1 {
+		permVal = 1
+	}
+	// 已在该层级：层级不变，仅按需更新权限
 	if current == req.NodeNo {
+		if req.CanInviteOrCreateGroup != nil {
+			if err := a.db.updateUserCanInviteOrCreateGroup(req.UID, permVal); err != nil {
+				a.Error("更新用户权限失败", zap.Error(err))
+				c.ResponseError(errors.New("更新用户权限失败"))
+				return
+			}
+		}
 		c.ResponseOK()
 		return
 	}
@@ -497,8 +559,12 @@ func (a *API) moveUser(c *wkhttp.Context) {
 			}
 		}
 	}
-	// 2) 修改用户层级
-	if _, err := tx.Update("user").Set("level_node_no", req.NodeNo).Where("uid=?", req.UID).Exec(); err != nil {
+	// 2) 修改用户层级（可选附带：把加人/建群权限设为请求值）
+	updateMap := map[string]interface{}{"level_node_no": req.NodeNo}
+	if req.CanInviteOrCreateGroup != nil {
+		updateMap["can_invite_or_create_group"] = permVal
+	}
+	if _, err := tx.Update("user").SetMap(updateMap).Where("uid=?", req.UID).Exec(); err != nil {
 		tx.Rollback()
 		a.Error("更新用户层级失败", zap.Error(err))
 		c.ResponseError(errors.New("更新用户层级失败"))
@@ -521,6 +587,91 @@ func (a *API) moveUser(c *wkhttp.Context) {
 			c.ResponseError(errors.New("添加新层级默认好友失败"))
 			return
 		}
+	}
+	if err := tx.Commit(); err != nil {
+		tx.Rollback()
+		a.Error("提交事务失败", zap.Error(err))
+		c.ResponseError(errors.New("提交事务失败"))
+		return
+	}
+	c.ResponseOK()
+}
+
+// 把用户移出当前层级：清空 user.level_node_no + 双向解除该层级的默认好友。
+// 用户原本就没有层级时直接返回 OK（幂等）。
+func (a *API) removeUser(c *wkhttp.Context) {
+	if err := c.CheckLoginRole(); err != nil {
+		c.ResponseError(err)
+		return
+	}
+	var req struct {
+		UID string `json:"uid"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.ResponseError(errors.New("请求数据格式有误"))
+		return
+	}
+	req.UID = strings.TrimSpace(req.UID)
+	if req.UID == "" {
+		c.ResponseError(errors.New("用户uid不能为空"))
+		return
+	}
+	// 查用户当前层级
+	var current string
+	count, err := a.db.session.Select("level_node_no").From("user").Where("uid=?", req.UID).Limit(1).Load(&current)
+	if err != nil {
+		a.Error("查询用户层级失败", zap.Error(err))
+		c.ResponseError(errors.New("查询用户层级失败"))
+		return
+	}
+	if count == 0 {
+		c.ResponseError(errors.New("用户不存在"))
+		return
+	}
+	if current == "" {
+		// 已经没有层级，幂等返回
+		c.ResponseOK()
+		return
+	}
+
+	tx, err := a.ctx.DB().Begin()
+	if err != nil {
+		a.Error("开启事务失败", zap.Error(err))
+		c.ResponseError(errors.New("开启事务失败"))
+		return
+	}
+	defer func() {
+		if e := recover(); e != nil {
+			tx.Rollback()
+			panic(e)
+		}
+	}()
+
+	// 1) 双向解除该层级的默认好友
+	friends, err := a.db.queryDefaultFriends(current)
+	if err != nil {
+		tx.Rollback()
+		a.Error("查询默认好友失败", zap.Error(err))
+		c.ResponseError(errors.New("查询默认好友失败"))
+		return
+	}
+	for _, fuid := range friends {
+		if fuid == "" || fuid == req.UID {
+			continue
+		}
+		if err := a.db.removeFriendBidirectional(tx, req.UID, fuid); err != nil {
+			tx.Rollback()
+			a.Error("解除默认好友失败", zap.Error(err))
+			c.ResponseError(errors.New("解除默认好友失败"))
+			return
+		}
+	}
+	// 2) 清空 user.level_node_no
+	if _, err := tx.Update("user").Set("level_node_no", "").Where("uid=?", req.UID).Exec(); err != nil {
+		tx.Rollback()
+		a.Error("更新用户层级失败", zap.Error(err))
+		c.ResponseError(errors.New("更新用户层级失败"))
+		return
 	}
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()

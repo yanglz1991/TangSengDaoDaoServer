@@ -33,11 +33,11 @@ func (m *managerDB) queryUserListWithPage(pageSize, page uint64, onelineStatus i
 	// return users, err
 
 	var users []*managerUserModel
-	selectStm := m.session.Select("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,max(user_online.online) online").From("user").LeftJoin("user_online", "user.uid=user_online.uid")
+	selectStm := m.session.Select("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,user.can_invite_or_create_group,max(user_online.online) online").From("user").LeftJoin("user_online", "user.uid=user_online.uid")
 	if onelineStatus != -1 {
 		selectStm = selectStm.Where("user_online.online=?", onelineStatus)
 	}
-	selectStm = selectStm.GroupBy("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid")
+	selectStm = selectStm.GroupBy("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,user.can_invite_or_create_group")
 
 	// select  from user left join user_online on user.uid=user_online.uid where user_online.online=1  group by user.uid,user.name,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at  limit 100
 	_, err := selectStm.Offset((page-1)*pageSize).Limit(pageSize).OrderDir("user.created_at", false).Load(&users)
@@ -51,11 +51,11 @@ func (m *managerDB) queryUserListWithPage(pageSize, page uint64, onelineStatus i
 func (m *managerDB) queryUserListWithPageAndKeyword(keyword string, onelineStatus int, pageSize, page uint64) ([]*managerUserModel, error) {
 	var users []*managerUserModel
 	like := "%" + keyword + "%"
-	selectStm := m.session.Select("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,max(user_online.online) online").From("user").LeftJoin("user_online", "user.uid=user_online.uid").Where("user.name like ? or user.uid like ? or user.phone like ? or user.short_no like ? or user.uid in (select uid from login_log where login_ip like ?) or user.uid in (select uid from device where device_name like ? or device_model like ?)", like, like, like, like, like, like, like)
+	selectStm := m.session.Select("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,user.can_invite_or_create_group,max(user_online.online) online").From("user").LeftJoin("user_online", "user.uid=user_online.uid").Where("user.name like ? or user.uid like ? or user.phone like ? or user.short_no like ? or user.uid in (select uid from login_log where login_ip like ?) or user.uid in (select uid from device where device_name like ? or device_model like ?)", like, like, like, like, like, like, like)
 	if onelineStatus != -1 {
 		selectStm = selectStm.Where("user_online.online=?", onelineStatus)
 	}
-	selectStm = selectStm.GroupBy("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid")
+	selectStm = selectStm.GroupBy("user.uid,user.name,user.username,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at,user.gitee_uid,user.github_uid,user.wx_openid,user.can_invite_or_create_group")
 
 	// select  from user left join user_online on user.uid=user_online.uid where user_online.online=1  group by user.uid,user.name,user.status,user.phone,user.short_no,user.sex,user.is_destroy,user.created_at  limit 100
 	_, err := selectStm.Offset((page-1)*pageSize).Limit(pageSize).OrderDir("user.created_at", false).Load(&users)
@@ -254,17 +254,18 @@ type managerLoginModel struct {
 }
 
 type managerUserModel struct {
-	Username  string
-	Name      string
-	UID       string
-	Status    int
-	Phone     string
-	ShortNo   string
-	WXOpenid  string // 微信openid
-	GiteeUID  string // gitee uid
-	GithubUID string // github uid
-	Sex       int
-	IsDestroy int
+	Username               string
+	Name                   string
+	UID                    string
+	Status                 int
+	Phone                  string
+	ShortNo                string
+	WXOpenid               string // 微信openid
+	GiteeUID               string // gitee uid
+	GithubUID              string // github uid
+	Sex                    int
+	IsDestroy              int
+	CanInviteOrCreateGroup int // 是否允许主动加好友/创建群聊 0.否 1.是
 	db.BaseModel
 }
 
