@@ -2851,6 +2851,9 @@ type loginUserDetailResp struct {
 	RSAPublicKey    string  `json:"rsa_public_key"` // 应用公钥做一些消息验证 base64编码
 	ShortStatus     int     `json:"short_status"`
 	MsgExpireSecond int64   `json:"msg_expire_second"` // 消息过期时长
+	// 是否允许主动加好友/创建群聊（0.否 1.是）。
+	// 客户端据此隐藏「添加好友」和「创建群聊」入口；服务端会做最终拦截。
+	CanInviteOrCreateGroup int `json:"can_invite_or_create_group"`
 }
 
 type setting struct {
@@ -2890,6 +2893,8 @@ func newLoginUserDetailResp(m *Model, token string, ctx *config.Context) *loginU
 		ShortStatus:     m.ShortStatus,
 		RSAPublicKey:    base64.StdEncoding.EncodeToString([]byte(ctx.GetConfig().AppRSAPubKey)),
 		MsgExpireSecond: m.MsgExpireSecond,
+		// 透传至客户端供 UI 隐藏添加好友/创建群聊入口
+		CanInviteOrCreateGroup: m.CanInviteOrCreateGroup,
 		Setting: setting{
 			SearchByPhone:     m.SearchByPhone,
 			SearchByShort:     m.SearchByShort,

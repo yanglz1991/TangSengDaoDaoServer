@@ -553,6 +553,13 @@ func (g *Group) groupCreate(c *wkhttp.Context) {
 		return
 	}
 
+	// 「创建群聊」权限校验：admin/superAdmin 不受限；
+	// 普通用户以 user.can_invite_or_create_group 字段为准（默认 0 禁止）。
+	if !user.CanInviteOrCreateGroup(creatorUser) {
+		c.ResponseError(errors.New("当前账号未开通创建群聊权限，请联系管理员"))
+		return
+	}
+
 	realUids = util.RemoveRepeatedElement(append(realUids, creator)) // 将创建者也加入成员内
 
 	// 查询成员用户信息

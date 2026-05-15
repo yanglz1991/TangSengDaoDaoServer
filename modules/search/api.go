@@ -72,24 +72,43 @@ func (s *Search) global(c *wkhttp.Context) {
 	highlights := []string{"payload.content", "payload.name"}
 
 	// 查询消息
-	msgResp, err := s.ctx.IMSearchUserMessages(&config.SearchUserMessageReq{
-		UID:          loginUID,
-		Payload:      payload,
-		PayloadTypes: req.ContentType,
-		Limit:        req.Limit,
-		Page:         req.Page,
-		FromUID:      req.FromUID,
-		ChannelID:    req.ChannelID,
-		ChannelType:  req.ChannelType,
-		Topic:        req.Topic,
-		StartTime:    req.StartTime,
-		EndTime:      req.EndTime,
-		Highlights:   highlights,
-	})
-	if err != nil {
-		s.Error("查询悟空IM消息错误", zap.Error(err))
-		c.ResponseError(errors.New("查询悟空IM消息错误"))
-		return
+	// 注意：仅当存在 keyword 或 only_message=1 / 指定了频道/topic 等"必须查消息"的场景才调用
+	// WuKongIM 的全文搜索插件（wk.plugin.search/usersearch）。
+	// 部分部署未启用该插件，调用会失败；为避免因消息搜索失败导致整个全局搜索（包括好友/群）
+	// 返回错误，这里在失败时降级为消息列表为空，仍正常返回好友/群搜索结果。
+	var msgResp *config.SearchUserMessageResp
+	needSearchMessages := req.OnlyMessage == 1 ||
+		req.ChannelID != "" ||
+		req.Topic != "" ||
+		req.FromUID != "" ||
+		strings.TrimSpace(req.Keyword) != ""
+	if needSearchMessages {
+		var msgErr error
+		msgResp, msgErr = s.ctx.IMSearchUserMessages(&config.SearchUserMessageReq{
+			UID:          loginUID,
+			Payload:      payload,
+			PayloadTypes: req.ContentType,
+			Limit:        req.Limit,
+			Page:         req.Page,
+			FromUID:      req.FromUID,
+			ChannelID:    req.ChannelID,
+			ChannelType:  req.ChannelType,
+			Topic:        req.Topic,
+			StartTime:    req.StartTime,
+			EndTime:      req.EndTime,
+			Highlights:   highlights,
+		})
+		if msgErr != nil {
+			// 仅当客户端明确"只搜消息"时（only_message=1，例如频道内聊天/文件 tab）才报错，
+			// 否则降级为消息列表为空，保留好友/群搜索结果，避免首页全局搜索"什么都没有"。
+			if req.OnlyMessage == 1 {
+				s.Error("查询悟空IM消息错误", zap.Error(msgErr))
+				c.ResponseError(errors.New("查询悟空IM消息错误"))
+				return
+			}
+			s.Warn("查询悟空IM消息错误，降级为仅返回好友/群搜索结果", zap.Error(msgErr))
+			msgResp = nil
+		}
 	}
 	channelIds := make([]string, 0)
 	messageIds := make([]string, 0)
@@ -198,8 +217,14 @@ func (s *Search) global(c *wkhttp.Context) {
 		}
 	}
 
+	// 是否需要按关键字搜索好友/群（仅在用户输入了非空关键字时才搜索；
+	// 否则像 keyword="" 这种"初始打开搜索面板"的请求会因为 strings.Contains(name, "") 恒为 true
+	// 把全部加入的群/全部好友都返回，体验异常）。
+	keywordTrimmed := strings.TrimSpace(req.Keyword)
+	searchFriendsAndGroups := req.OnlyMessage == 0 && keywordTrimmed != ""
+
 	var joinedGroups []*group.InfoResp
-	if req.OnlyMessage == 0 {
+	if searchFriendsAndGroups {
 		joinedGroups, err = s.groupService.GetGroupsWithMemberUID(loginUID)
 		if err != nil {
 			s.Error("查询加入的群列表错误", zap.Error(err))
@@ -238,18 +263,18 @@ func (s *Search) global(c *wkhttp.Context) {
 
 	// 加入的群
 	groupResps := make([]*channelResp, 0)
-	if req.OnlyMessage == 0 && len(joinedGroups) > 0 {
+	if searchFriendsAndGroups && len(joinedGroups) > 0 {
 		for _, g := range joinedGroups {
 			isAdd := false
 			remark := ""
-			if strings.Contains(g.Name, req.Keyword) {
+			if strings.Contains(g.Name, keywordTrimmed) {
 				isAdd = true
 			}
 			if len(groups) > 0 {
 				for _, group := range groups {
 					if group.GroupNo == g.GroupNo {
 						remark = group.Remark
-						if strings.Contains(group.Remark, req.Keyword) {
+						if strings.Contains(group.Remark, keywordTrimmed) {
 							isAdd = true
 						}
 						break
@@ -257,7 +282,7 @@ func (s *Search) global(c *wkhttp.Context) {
 				}
 			}
 			if isAdd {
-				name := strings.ReplaceAll(g.Name, req.Keyword, fmt.Sprintf("<mark>%s</mark>", req.Keyword))
+				name := strings.ReplaceAll(g.Name, keywordTrimmed, fmt.Sprintf("<mark>%s</mark>", keywordTrimmed))
 				groupResps = append(groupResps, &channelResp{
 					ChannelID:     g.GroupNo,
 					ChannelType:   common.ChannelTypeGroup.Uint8(),
@@ -270,8 +295,8 @@ func (s *Search) global(c *wkhttp.Context) {
 
 	// 查询好友
 	friendResps := make([]*channelResp, 0)
-	if req.OnlyMessage == 0 {
-		friends, err := s.userService.SearchFriendsWithKeyword(loginUID, req.Keyword)
+	if searchFriendsAndGroups {
+		friends, err := s.userService.SearchFriendsWithKeyword(loginUID, keywordTrimmed)
 		if err != nil {
 			s.Error("查询好友错误", zap.Error(err))
 			c.ResponseError(err)
@@ -279,10 +304,35 @@ func (s *Search) global(c *wkhttp.Context) {
 		}
 		if len(friends) > 0 {
 			for _, friend := range friends {
-				name := strings.ReplaceAll(friend.Name, req.Keyword, fmt.Sprintf("<mark>%s</mark>", req.Keyword))
+				// 同时支持昵称与备注模糊匹配：
+				//  - 备注命中时优先用备注作为展示文案（与三端"备注优先于昵称"的列表惯例一致）；
+				//  - 否则使用昵称。命中字段做 <mark> 高亮，未命中字段保持原样。
+				nameMatch := strings.Contains(friend.Name, keywordTrimmed)
+				remarkMatch := friend.Remark != "" && strings.Contains(friend.Remark, keywordTrimmed)
+				highlight := func(s string) string {
+					if s == "" || keywordTrimmed == "" {
+						return s
+					}
+					return strings.ReplaceAll(s, keywordTrimmed, fmt.Sprintf("<mark>%s</mark>", keywordTrimmed))
+				}
+				var displayName string
+				switch {
+				case remarkMatch:
+					displayName = highlight(friend.Remark)
+				case nameMatch:
+					displayName = highlight(friend.Name)
+				default:
+					// 走到这里说明 SQL 命中了行（极少见，例如大小写敏感/排序规则差异），
+					// 兜底优先展示备注，没有备注则展示昵称，并尽量做一次高亮。
+					if friend.Remark != "" {
+						displayName = highlight(friend.Remark)
+					} else {
+						displayName = highlight(friend.Name)
+					}
+				}
 				friendResps = append(friendResps, &channelResp{
 					ChannelID:     friend.UID,
-					ChannelName:   name,
+					ChannelName:   displayName,
 					ChannelType:   common.ChannelTypePerson.Uint8(),
 					ChannelRemark: friend.Remark,
 				})

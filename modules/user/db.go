@@ -6,6 +6,7 @@ import (
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/db"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhttp"
 	"github.com/gocraft/dbr/v2"
 )
 
@@ -309,45 +310,63 @@ type Detail struct {
 
 // Model 用户db model
 type Model struct {
-	AppID             string //app id
-	UID               string // 用户唯一id
-	Name              string // 用户名称
-	Username          string // 用户名
-	Email             string // email地址
-	Password          string // 用户密码
-	Category          string //用户分类
-	Sex               int    //性别
-	ShortNo           string //唯一短编号
-	ShortStatus       int    //唯一短编号是否修改0.否1.是
-	Zone              string //区号
-	Phone             string //手机号
-	ChatPwd           string //聊天密码
-	LockScreenPwd     string // 锁屏密码
-	LockAfterMinute   int    // 在几分钟后锁屏 0表示立即
-	DeviceLock        int    //是否开启设备锁
-	SearchByPhone     int    //是否可以通过手机号搜索0.否1.是
-	SearchByShort     int    //是否可以通过短编号搜索0.否1.是
-	NewMsgNotice      int    //新消息通知0.否1.是
-	MsgShowDetail     int    //显示消息通知详情0.否1.是
-	VoiceOn           int    //声音0.否1.是
-	ShockOn           int    //震动0.否1.是
-	OfflineProtection int    // 离线保护
-	Version           int64
-	Status            int    // 状态 0.禁用 1.启用
-	Vercode           string //验证码
-	QRVercode         string // 二维码验证码
-	IsUploadAvatar    int    // 是否上传过头像0:未上传1:已上传
-	Role              string // 角色 admin/superAdmin
-	Robot             int    // 机器人0.否1.是
-	MuteOfApp         int    // app是否禁音（当pc登录的时候app可以设置禁音，当pc登录后有效）
-	IsDestroy         int    // 是否已注销0.否1.是
-	WXOpenid          string // 微信openid
-	WXUnionid         string // 微信unionid
-	GiteeUID          string // gitee uid
-	GithubUID         string // github uid
-	Web3PublicKey     string // web3公钥
-	MsgExpireSecond   int64  // 消息过期时长
+	AppID                  string //app id
+	UID                    string // 用户唯一id
+	Name                   string // 用户名称
+	Username               string // 用户名
+	Email                  string // email地址
+	Password               string // 用户密码
+	Category               string //用户分类
+	Sex                    int    //性别
+	ShortNo                string //唯一短编号
+	ShortStatus            int    //唯一短编号是否修改0.否1.是
+	Zone                   string //区号
+	Phone                  string //手机号
+	ChatPwd                string //聊天密码
+	LockScreenPwd          string // 锁屏密码
+	LockAfterMinute        int    // 在几分钟后锁屏 0表示立即
+	DeviceLock             int    //是否开启设备锁
+	SearchByPhone          int    //是否可以通过手机号搜索0.否1.是
+	SearchByShort          int    //是否可以通过短编号搜索0.否1.是
+	CanInviteOrCreateGroup int    //是否允许主动加好友/创建群聊 0.否 1.是 (默认 0)
+	NewMsgNotice           int    //新消息通知0.否1.是
+	MsgShowDetail          int    //显示消息通知详情0.否1.是
+	VoiceOn                int    //声音0.否1.是
+	ShockOn                int    //震动0.否1.是
+	OfflineProtection      int    // 离线保护
+	Version                int64
+	Status                 int    // 状态 0.禁用 1.启用
+	Vercode                string //验证码
+	QRVercode              string // 二维码验证码
+	IsUploadAvatar         int    // 是否上传过头像0:未上传1:已上传
+	Role                   string // 角色 admin/superAdmin
+	Robot                  int    // 机器人0.否1.是
+	MuteOfApp              int    // app是否禁音（当pc登录的时候app可以设置禁音，当pc登录后有效）
+	IsDestroy              int    // 是否已注销0.否1.是
+	WXOpenid               string // 微信openid
+	WXUnionid              string // 微信unionid
+	GiteeUID               string // gitee uid
+	GithubUID              string // github uid
+	Web3PublicKey          string // web3公钥
+	MsgExpireSecond        int64  // 消息过期时长
 	db.BaseModel
+}
+
+// CanInviteOrCreateGroup 判断该用户是否允许「主动加好友」/「创建群聊」。
+//
+// 规则：
+//  1. admin / superAdmin 角色不受该字段约束，恒为允许；
+//  2. 其它用户以 user.can_invite_or_create_group 字段为准（1 允许，0 禁止）。
+//
+// 入参 m 为 nil 时返回 false。
+func CanInviteOrCreateGroup(m *Model) bool {
+	if m == nil {
+		return false
+	}
+	if m.Role == string(wkhttp.Admin) || m.Role == string(wkhttp.SuperAdmin) {
+		return true
+	}
+	return m.CanInviteOrCreateGroup == 1
 }
 
 // type userSetting struct {

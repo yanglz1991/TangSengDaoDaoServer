@@ -175,11 +175,16 @@ func (d *friendDB) queryWithToUIDAndUIDs(toUID string, uids []string) ([]*Friend
 }
 
 // QueryFriendsWithKeyword 通过关键字查询自己的好友
+// 同时模糊匹配用户昵称(user.name) 与好友备注；备注用于搜索与展示的字段统一为
+// user_setting.remark（即 PUT /v1/friend/remark 写入的字段）。
+// 注意：friend.remark 是好友申请时填写的"申请备注"，跟用户后续在通讯录里修改的
+// 备注不是同一个字段，历史代码错误地用 friend.remark 做匹配，导致备注搜索失效。
 func (d *friendDB) QueryFriendsWithKeyword(uid string, keyword string) ([]*DetailModel, error) {
 	var details []*DetailModel
-	builder := d.session.Select("friend.id,friend.to_uid,IFNULL(user.name,'') to_name,friend.is_deleted,friend.created_at,friend.updated_at,IFNULL(user_setting.mute,0) mute,IFNULL(user_setting.top,0) top,IFNULL(user_setting.version,0)+friend.version version").From("friend").LeftJoin("user", "friend.to_uid=user.uid").LeftJoin("user_setting", "user.uid=user_setting.to_uid and user_setting.uid=friend.uid").Where("friend.uid=?", uid).OrderDir("friend.version + IFNULL(user_setting.version,0)", true)
+	builder := d.session.Select("friend.id,friend.to_uid,IFNULL(user.name,'') to_name,IFNULL(user_setting.remark,'') remark,friend.is_deleted,friend.created_at,friend.updated_at,IFNULL(user_setting.mute,0) mute,IFNULL(user_setting.top,0) top,IFNULL(user_setting.version,0)+friend.version version").From("friend").LeftJoin("user", "friend.to_uid=user.uid").LeftJoin("user_setting", "user.uid=user_setting.to_uid and user_setting.uid=friend.uid").Where("friend.uid=?", uid).OrderDir("friend.version + IFNULL(user_setting.version,0)", true)
 	if keyword != "" {
-		builder = builder.Where("user.name like ?", "%"+keyword+"%")
+		like := "%" + keyword + "%"
+		builder = builder.Where("user.name like ? OR IFNULL(user_setting.remark,'') like ?", like, like)
 	}
 	_, err := builder.Load(&details)
 	return details, err

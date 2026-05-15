@@ -2,6 +2,7 @@ package user
 
 import (
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	common2 "github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
+	"github.com/gin-gonic/gin"
 
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/log"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
@@ -68,6 +70,7 @@ func (m *Manager) Route(r *wkhttp.WKHttp) {
 		auth.GET("/user/admin", m.getAdminUsers)              // 查询管理员用户
 		auth.DELETE("/user/admin", m.deleteAdminUsers)        // 删除管理员用户
 		auth.POST("/user/add", m.addUser)                     // 添加一个用户
+		auth.POST("/user/batch_add", m.batchAddUser)          // 批量生成账户（递增手机号）
 		auth.POST("/user/resetpassword", m.resetUserPassword) // 重置用户密码
 		auth.POST("/user/updatename", m.updateUserName)       // 修改用户昵称
 		auth.GET("/user/list", m.list)                        // 用户列表
@@ -570,6 +573,10 @@ func (m *Manager) addUser(c *wkhttp.Context) {
 	userModel.VoiceOn = 1
 	userModel.ShockOn = 1
 	userModel.Sex = req.Sex
+	// 「加好友 / 创建群聊」权限：默认 0（禁止），管理员添加时可显式开启。
+	if req.CanInviteOrCreateGroup == 1 {
+		userModel.CanInviteOrCreateGroup = 1
+	}
 	userModel.Status = int(common.UserAvailable)
 	err = m.userDB.insertTx(userModel, tx)
 	if err != nil {
@@ -614,6 +621,202 @@ func (m *Manager) addUser(c *wkhttp.Context) {
 	}
 	m.ctx.EventCommit(eventID)
 	c.ResponseOK()
+}
+
+// batchAddUser 批量生成账户（基于起始手机号递增）
+//
+// 典型用法：
+//
+//	start_phone=15500000000 count=100 -> 生成 15500000000 ~ 15500000099 共 100 条
+//
+// 字段：
+//
+//	start_phone (必填)             起始手机号，必须是 11 位数字字符串
+//	count       (必填, 1~1000)     生成数量
+//	zone        (可选, 默认 0086)   手机号区号
+//	password    (可选)             登录密码，留空则使用 phone 自身
+//	sex         (可选, 默认 1)
+//	can_invite_or_create_group (可选 0/1, 默认 0)  是否开启「加好友/创建群聊」权限
+//
+// 返回：
+//
+//	success: 成功条数
+//	skipped: 已存在跳过的手机号 [{phone, reason}]
+//	failed:  失败的手机号列表 [{phone, reason}]
+func (m *Manager) batchAddUser(c *wkhttp.Context) {
+	if err := c.CheckLoginRoleIsSuperAdmin(); err != nil {
+		c.ResponseError(err)
+		return
+	}
+	var req struct {
+		StartPhone             string `json:"start_phone"`
+		Count                  int    `json:"count"`
+		Zone                   string `json:"zone"`
+		Password               string `json:"password"`
+		Sex                    int    `json:"sex"`
+		CanInviteOrCreateGroup int    `json:"can_invite_or_create_group"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.ResponseError(errors.New("请求数据格式有误！"))
+		return
+	}
+
+	// 输入校验
+	startPhone := strings.TrimSpace(req.StartPhone)
+	if len(startPhone) != 11 {
+		c.ResponseError(errors.New("起始手机号必须是 11 位数字"))
+		return
+	}
+	startNum, err := strconv.ParseInt(startPhone, 10, 64)
+	if err != nil {
+		c.ResponseError(errors.New("起始手机号必须是 11 位数字"))
+		return
+	}
+	if req.Count <= 0 {
+		c.ResponseError(errors.New("生成数量必须大于 0"))
+		return
+	}
+	const maxBatch = 1000
+	if req.Count > maxBatch {
+		c.ResponseError(fmt.Errorf("单次最多生成 %d 个账户", maxBatch))
+		return
+	}
+	zone := req.Zone
+	if zone == "" {
+		zone = "0086"
+	}
+	sex := req.Sex
+	if sex != 0 && sex != 1 {
+		sex = 1
+	}
+
+	type batchItem struct {
+		Phone  string `json:"phone"`
+		Reason string `json:"reason,omitempty"`
+		UID    string `json:"uid,omitempty"`
+	}
+	skipped := make([]batchItem, 0)
+	failed := make([]batchItem, 0)
+	successList := make([]batchItem, 0)
+
+	// 一一生成；每个用户独立事务，避免单条失败影响整体。
+	for i := 0; i < req.Count; i++ {
+		phone := fmt.Sprintf("%011d", startNum+int64(i))
+
+		// 已存在则跳过
+		existed, qErr := m.userDB.QueryByUsername(fmt.Sprintf("%s%s", zone, phone))
+		if qErr != nil {
+			failed = append(failed, batchItem{Phone: phone, Reason: "查询是否已存在失败"})
+			m.Error("批量生成用户：查询已存在失败", zap.Error(qErr), zap.String("phone", phone))
+			continue
+		}
+		if existed != nil {
+			skipped = append(skipped, batchItem{Phone: phone, Reason: "该手机号已存在"})
+			continue
+		}
+
+		// 生成短编号
+		var shortNo string
+		var shortNumStatus int
+		if m.ctx.GetConfig().ShortNo.NumOn {
+			shortNo, err = m.commonService.GetShortno()
+			if err != nil {
+				failed = append(failed, batchItem{Phone: phone, Reason: "获取短编号失败"})
+				continue
+			}
+		} else {
+			shortNo = util.Ten2Hex(time.Now().UnixNano())
+		}
+		if m.ctx.GetConfig().ShortNo.EditOff {
+			shortNumStatus = 1
+		}
+
+		uid := util.GenerUUID()
+
+		// 名称/密码默认值（与用户原话一致：默认都是手机号本身）
+		name := phone
+		password := req.Password
+		if strings.TrimSpace(password) == "" {
+			password = phone
+		}
+
+		tx, txErr := m.db.session.Begin()
+		if txErr != nil {
+			failed = append(failed, batchItem{Phone: phone, Reason: "开启事务失败"})
+			m.Error("批量生成用户：开启事务失败", zap.Error(txErr), zap.String("phone", phone))
+			continue
+		}
+
+		userModel := &Model{}
+		userModel.UID = uid
+		userModel.Name = name
+		userModel.Vercode = fmt.Sprintf("%s@%d", util.GenerUUID(), common.User)
+		userModel.QRVercode = fmt.Sprintf("%s@%d", util.GenerUUID(), common.QRCode)
+		userModel.Phone = phone
+		userModel.Username = fmt.Sprintf("%s%s", zone, phone)
+		userModel.Zone = zone
+		userModel.Password = util.MD5(util.MD5(password))
+		userModel.ShortNo = shortNo
+		userModel.IsUploadAvatar = 0
+		userModel.NewMsgNotice = 1
+		userModel.MsgShowDetail = 1
+		userModel.SearchByPhone = 1
+		userModel.ShortStatus = shortNumStatus
+		userModel.SearchByShort = 1
+		userModel.VoiceOn = 1
+		userModel.ShockOn = 1
+		userModel.Sex = sex
+		if req.CanInviteOrCreateGroup == 1 {
+			userModel.CanInviteOrCreateGroup = 1
+		}
+		userModel.Status = int(common.UserAvailable)
+
+		if err := m.userDB.insertTx(userModel, tx); err != nil {
+			tx.Rollback()
+			failed = append(failed, batchItem{Phone: phone, Reason: "插入用户记录失败"})
+			m.Error("批量生成用户：插入失败", zap.Error(err), zap.String("phone", phone))
+			continue
+		}
+		// 与系统账号 / 文件助手互为好友（与 addUser 行为保持一致）
+		if err := m.addSystemFriend(uid); err != nil {
+			tx.Rollback()
+			failed = append(failed, batchItem{Phone: phone, Reason: "添加系统好友失败"})
+			continue
+		}
+		if err := m.addFileHelperFriend(uid); err != nil {
+			tx.Rollback()
+			failed = append(failed, batchItem{Phone: phone, Reason: "添加文件助手好友失败"})
+			continue
+		}
+		// 用户注册事件（friend 模块依赖此事件清理 vercode 等）
+		eventID, evErr := m.ctx.EventBegin(&wkevent.Data{
+			Event: event.EventUserRegister,
+			Type:  wkevent.Message,
+			Data: map[string]interface{}{
+				"uid": uid,
+			},
+		}, tx)
+		if evErr != nil {
+			tx.RollbackUnlessCommitted()
+			failed = append(failed, batchItem{Phone: phone, Reason: "开启用户注册事件失败"})
+			continue
+		}
+		if err := tx.Commit(); err != nil {
+			tx.Rollback()
+			failed = append(failed, batchItem{Phone: phone, Reason: "提交事务失败"})
+			continue
+		}
+		m.ctx.EventCommit(eventID)
+		successList = append(successList, batchItem{Phone: phone, UID: uid})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total":   req.Count,
+		"success": len(successList),
+		"skipped": skipped,
+		"failed":  failed,
+		"items":   successList,
+	})
 }
 
 // 用户列表
@@ -1248,11 +1451,12 @@ type managerLoginResp struct {
 	Role  string `json:"role"`
 }
 type managerAddUserReq struct {
-	Name     string `json:"name"`
-	Password string `json:"password"`
-	Phone    string `json:"phone"`
-	Zone     string `json:"zone"`
-	Sex      int    `json:"sex"`
+	Name                   string `json:"name"`
+	Password               string `json:"password"`
+	Phone                  string `json:"phone"`
+	Zone                   string `json:"zone"`
+	Sex                    int    `json:"sex"`
+	CanInviteOrCreateGroup int    `json:"can_invite_or_create_group"` // 是否允许主动加好友/创建群聊 0.否 1.是
 }
 type managerBlackUserResp struct {
 	Name     string `json:"name"`

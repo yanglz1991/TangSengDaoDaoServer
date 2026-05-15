@@ -301,6 +301,13 @@ func (f *Friend) friendApply(c *wkhttp.Context) {
 		c.ResponseError(errors.New("登录用户不存在！"))
 		return
 	}
+	// 「主动加好友」权限校验：
+	//   admin/superAdmin 不受限；其它用户以 user.can_invite_or_create_group 字段为准。
+	//   说明：被动接受别人发来的申请走 PUT /v1/friend/sure，不在此校验范围内。
+	if !CanInviteOrCreateGroup(loginUserInfo) {
+		c.ResponseError(errors.New("当前账号未开通加好友权限，请联系管理员"))
+		return
+	}
 	// 是否是好友
 	isFriendLoginUser, err := f.db.IsFriend(fromUID, req.ToUID)
 	if err != nil {
