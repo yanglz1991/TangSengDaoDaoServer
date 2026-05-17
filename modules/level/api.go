@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/common"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/config"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/log"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
@@ -464,6 +465,58 @@ func (a *API) updateUserPermission(c *wkhttp.Context) {
 	c.ResponseOK()
 }
 
+// imWhitelistAddBidirectional 双向同步 IM 白名单（best-effort，失败仅告警）。
+// 与 event.go 注册路径保持一致：friend 表写入后必须再同步 IM 白名单，
+// 否则发消息时 IM 服务端会因不在对方白名单而下发「xx 开启了朋友验证」提示。
+func (a *API) imWhitelistAddBidirectional(uid, fuid string) {
+	if uid == "" || fuid == "" || uid == fuid {
+		return
+	}
+	if err := a.ctx.IMWhitelistAdd(config.ChannelWhitelistReq{
+		ChannelReq: config.ChannelReq{
+			ChannelID:   uid,
+			ChannelType: common.ChannelTypePerson.Uint8(),
+		},
+		UIDs: []string{fuid},
+	}); err != nil {
+		a.Warn("level 添加IM白名单失败", zap.Error(err), zap.String("channel", uid), zap.String("uid", fuid))
+	}
+	if err := a.ctx.IMWhitelistAdd(config.ChannelWhitelistReq{
+		ChannelReq: config.ChannelReq{
+			ChannelID:   fuid,
+			ChannelType: common.ChannelTypePerson.Uint8(),
+		},
+		UIDs: []string{uid},
+	}); err != nil {
+		a.Warn("level 添加IM白名单失败", zap.Error(err), zap.String("channel", fuid), zap.String("uid", uid))
+	}
+}
+
+// imWhitelistRemoveBidirectional 双向移除 IM 白名单（best-effort）。
+func (a *API) imWhitelistRemoveBidirectional(uid, fuid string) {
+	if uid == "" || fuid == "" || uid == fuid {
+		return
+	}
+	if err := a.ctx.IMWhitelistRemove(config.ChannelWhitelistReq{
+		ChannelReq: config.ChannelReq{
+			ChannelID:   uid,
+			ChannelType: common.ChannelTypePerson.Uint8(),
+		},
+		UIDs: []string{fuid},
+	}); err != nil {
+		a.Warn("level 移除IM白名单失败", zap.Error(err), zap.String("channel", uid), zap.String("uid", fuid))
+	}
+	if err := a.ctx.IMWhitelistRemove(config.ChannelWhitelistReq{
+		ChannelReq: config.ChannelReq{
+			ChannelID:   fuid,
+			ChannelType: common.ChannelTypePerson.Uint8(),
+		},
+		UIDs: []string{uid},
+	}); err != nil {
+		a.Warn("level 移除IM白名单失败", zap.Error(err), zap.String("channel", fuid), zap.String("uid", uid))
+	}
+}
+
 // 移动用户：删除旧层级默认好友 + 写新层级默认好友 + 修改 user.level_node_no
 func (a *API) moveUser(c *wkhttp.Context) {
 	if err := c.CheckLoginRole(); err != nil {
@@ -539,27 +592,12 @@ func (a *API) moveUser(c *wkhttp.Context) {
 		}
 	}()
 
-	// 1) 删除旧层级默认好友（双向解除）
-	if current != "" {
-		oldFriends, err := a.db.queryDefaultFriends(current)
-		if err != nil {
-			tx.Rollback()
-			c.ResponseError(errors.New("查询旧层级默认好友失败"))
-			return
-		}
-		for _, fuid := range oldFriends {
-			if fuid == req.UID {
-				continue
-			}
-			if err := a.db.removeFriendBidirectional(tx, req.UID, fuid); err != nil {
-				tx.Rollback()
-				a.Error("解除旧层级默认好友失败", zap.Error(err))
-				c.ResponseError(errors.New("解除旧层级默认好友失败"))
-				return
-			}
-		}
-	}
-	// 2) 修改用户层级（可选附带：把加人/建群权限设为请求值）
+	// 收集需要在事务 commit 后同步 IM 白名单的好友
+	var newFriendsToSync []string
+
+	// 注意：移动层级时不再解除旧层级的默认好友关系，
+	// 保留用户原有好友（产品需求：层级变更不影响既有联系人）
+	// 1) 修改用户层级（可选附带：把加人/建群权限设为请求值）
 	updateMap := map[string]interface{}{"level_node_no": req.NodeNo}
 	if req.CanInviteOrCreateGroup != nil {
 		updateMap["can_invite_or_create_group"] = permVal
@@ -587,12 +625,17 @@ func (a *API) moveUser(c *wkhttp.Context) {
 			c.ResponseError(errors.New("添加新层级默认好友失败"))
 			return
 		}
+		newFriendsToSync = append(newFriendsToSync, fuid)
 	}
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()
 		a.Error("提交事务失败", zap.Error(err))
 		c.ResponseError(errors.New("提交事务失败"))
 		return
+	}
+	// 3) 事务提交成功后同步 IM 白名单（否则发消息会触发「开启了朋友验证」）
+	for _, fuid := range newFriendsToSync {
+		a.imWhitelistAddBidirectional(req.UID, fuid)
 	}
 	c.ResponseOK()
 }
@@ -655,6 +698,7 @@ func (a *API) removeUser(c *wkhttp.Context) {
 		c.ResponseError(errors.New("查询默认好友失败"))
 		return
 	}
+	var friendsToSync []string
 	for _, fuid := range friends {
 		if fuid == "" || fuid == req.UID {
 			continue
@@ -665,6 +709,7 @@ func (a *API) removeUser(c *wkhttp.Context) {
 			c.ResponseError(errors.New("解除默认好友失败"))
 			return
 		}
+		friendsToSync = append(friendsToSync, fuid)
 	}
 	// 2) 清空 user.level_node_no
 	if _, err := tx.Update("user").Set("level_node_no", "").Where("uid=?", req.UID).Exec(); err != nil {
@@ -678,6 +723,10 @@ func (a *API) removeUser(c *wkhttp.Context) {
 		a.Error("提交事务失败", zap.Error(err))
 		c.ResponseError(errors.New("提交事务失败"))
 		return
+	}
+	// 3) 事务提交成功后同步 IM 白名单
+	for _, fuid := range friendsToSync {
+		a.imWhitelistRemoveBidirectional(req.UID, fuid)
 	}
 	c.ResponseOK()
 }
