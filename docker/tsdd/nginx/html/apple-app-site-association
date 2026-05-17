@@ -1,0 +1,31 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["F68A4Y2SZ5.com.im.qx"],
+        "components": [
+          {
+            "/": "/share/*",
+            "comment": "分享卡片深链"
+          },
+          {
+            "/": "/invite/*",
+            "comment": "邀请加好友/入群"
+          },
+          {
+            "/": "/i/*",
+            "comment": "短链跳转"
+          },
+          {
+            "/": "*",
+            "exclude": true,
+            "comment": "其他路径仍由网页处理"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["F68A4Y2SZ5.com.im.qx"]
+  }
+}

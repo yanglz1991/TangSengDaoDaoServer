@@ -84,6 +84,8 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/logs:/var/log/nginx
+      # 静态文件目录（含 iOS Universal Links 的 AASA 文件）
+      - ./nginx/html:/usr/share/nginx/html:ro
   minio:
     # minio文件管理服务
     image: minio/minio:RELEASE.2024-04-06T05-26-02Z # use a remote image
