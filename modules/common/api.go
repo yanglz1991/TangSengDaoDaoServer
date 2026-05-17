@@ -149,6 +149,7 @@ func (cn *Common) getPCNewVersion(c *wkhttp.Context) {
 		"path":         downloadURL,
 		"sha512":       model.Signature,
 		"releaseNotes": model.UpdateDesc,
+		"isForce":      model.IsForce, // 是否强制更新：1=强制，0=非强制。electron-updater 解析 yml 时保留自定义字段，会随 update-available 事件透传到客户端
 	})
 	// if os == "latest-mac.yml" || os == "latest-linux.yml" || os == "latest.yml" {
 
