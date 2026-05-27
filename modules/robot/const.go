@@ -20,8 +20,8 @@ const (
 var systemRobotMap = []*systemRobotMenu{
 	// {
 	// 	CMD:          "/基本信息",
-	// 	Remark:       "QX基本信息",
-	// 	ReplyContent: "QX是一款轻量级，高性能，重安全专注于私有化部署的开源即时通讯系统。",
+	// 	Remark:       "喜聊基本信息",
+	// 	ReplyContent: "喜聊是一款轻量级，高性能，重安全专注于私有化部署的开源即时通讯系统。",
 	// 	Type:         string(None),
 	// },
 	{
@@ -50,8 +50,8 @@ var systemRobotMap = []*systemRobotMenu{
 	// },
 	// {
 	// 	CMD:          "/Android包下载",
-	// 	Remark:       "如何下载QX Android包",
-	// 	ReplyContent: "您好，QX Android应用下载地址 https://qx.qhfhasina.com",
+	// 	Remark:       "如何下载喜聊 Android包",
+	// 	ReplyContent: "您好，喜聊 Android应用下载地址 https://qx.qhfhasina.com",
 	// 	Type:         string(None),
 	// },
 	// {

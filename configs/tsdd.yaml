@@ -3,7 +3,7 @@ mode: "debug" #   运行模式 debug or release
 # adminpwd: "123456" # 管理员密码 如果本地启动需要放开注释，不然登录不了
 #addr: ":8090" # api监听地址
 #grpcAddr: "0.0.0.0:6979" # webhook grpc监听地址 给悟空IM提供的
-appName: "QX" # 项目名称
+appName: "喜聊" # 项目名称
 #rootDir: "tsdddata" # 数据根目录
 #messageSaveAcrossDevice: true # 消息是否跨设备保存（换设备登录消息是否还能同步到老消息）
 #welcomeMessage: "欢迎使用{{appName}}" # 欢迎消息
@@ -55,7 +55,7 @@ external:
 # smsbao: # 短信宝 https://www.smsbao.com/
 #   account: "dapeng131" 
 #   apiKey: "703f3eb54c644d4d8b0060f679f39fcf" 
-#   template: "【QX】您的验证码是{code}。如非本人操作，请忽略本短信" 
+#   template: "【喜聊】您的验证码是{code}。如非本人操作，请忽略本短信" 
 
 ##################### 文件服务 ####################
 #fileService: "minio" # 文件服务 minio or aliyunOSS or seaweedFS or qiniu
