@@ -1,8 +1,8 @@
 swagger: "2.0"
 info:
-  description: "喜聊 API"
+  description: "禧语 API"
   version: "1.0.0"
-  title: "喜聊 API"
+  title: "禧语 API"
 host: "api.botgate.cn"
 tags:
   - name: "group"
