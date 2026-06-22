@@ -45,7 +45,6 @@ func (cn *Common) Route(r *wkhttp.WKHttp) {
 	{
 		common.POST("/appversion", cn.addAppVersion)                  // 添加APP版本
 		common.GET("/appversion/:os/:version", cn.getNewVersion)      // 获取最新版本
-		common.GET("/appversion/list", cn.appVersionList)             // 版本列表
 		common.GET("/chatbg", cn.chatBgList)                          // 聊天背景列表
 		common.GET("/appmodule", cn.appModule)                        // app模块列表
 		common.GET("/secure_channel", cn.secureChannelGet)            // 加密通道配置(不含密码与url)
@@ -56,6 +55,7 @@ func (cn *Common) Route(r *wkhttp.WKHttp) {
 		commonNoAuth.GET("/countries", cn.countriesList)
 
 		commonNoAuth.GET("/appconfig", cn.appConfig) // app配置
+		commonNoAuth.GET("/appversion/list", cn.appVersionList) // 版本列表(免认证,供下载页使用)
 		// commonNoAuth.GET("/keepalive", cn.getKeepAliveVideo)   // 获取后台运行引导视频
 		commonNoAuth.GET("/updater/:os/:version", cn.updater)  // 版本更新检查（兼容tauri）
 		commonNoAuth.GET("/pcupdater/:os", cn.getPCNewVersion) // pc版本更新检查
@@ -415,11 +415,6 @@ func (cn *Common) getNewVersion(c *wkhttp.Context) {
 
 // 查询总记录
 func (cn *Common) appVersionList(c *wkhttp.Context) {
-	err := c.CheckLoginRole()
-	if err != nil {
-		c.ResponseError(err)
-		return
-	}
 	pageIndex, pageSize := c.GetPage()
 	list, err := cn.db.queryAppVersionListWithPage(uint64(pageSize), uint64(pageIndex))
 	if err != nil {
