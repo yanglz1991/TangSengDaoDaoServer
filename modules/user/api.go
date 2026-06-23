@@ -1281,18 +1281,20 @@ func (u *User) register(c *wkhttp.Context) {
 		c.ResponseError(errors.New("该用户已存在"))
 		return
 	}
-	//测试模式
-	if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
-		if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != req.Code {
-			c.ResponseError(errors.New("验证码错误"))
-			return
-		}
-	} else {
-		//线上验证短信验证码
-		err = u.smsServie.Verify(registerSpanCtx, req.Zone, req.Phone, req.Code, commonapi.CodeTypeRegister)
-		if err != nil {
-			c.ResponseError(err)
-			return
+	if u.isSmsVerifyOn() {
+		//测试模式
+		if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
+			if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != req.Code {
+				c.ResponseError(errors.New("验证码错误"))
+				return
+			}
+		} else {
+			//线上验证短信验证码
+			err = u.smsServie.Verify(registerSpanCtx, req.Zone, req.Phone, req.Code, commonapi.CodeTypeRegister)
+			if err != nil {
+				c.ResponseError(err)
+				return
+			}
 		}
 	}
 	uid := util.GenerUUID()
@@ -1985,6 +1987,12 @@ func (u *User) sendRegisterCode(c *wkhttp.Context) {
 		})
 		return
 	}
+	if !u.isSmsVerifyOn() {
+		c.Response(map[string]interface{}{
+			"exist": 0,
+		})
+		return
+	}
 	err = u.smsServie.SendVerifyCode(spanCtx, req.Zone, req.Phone, commonapi.CodeTypeRegister)
 	if err != nil {
 		u.Error("发送短信验证码失败", zap.Error(err))
@@ -2133,6 +2141,10 @@ func (u *User) sendLoginCheckPhoneCode(c *wkhttp.Context) {
 	// 	c.ResponseOK()
 	// 	return
 	// }
+	if !u.isSmsVerifyOn() {
+		c.ResponseOK()
+		return
+	}
 	err = u.smsServie.SendVerifyCode(spanCtx, userinfo.Zone, userinfo.Phone, commonapi.CodeTypeCheckMobile)
 	if err != nil {
 		u.Error("发送短信失败", zap.Error(err))
@@ -2180,11 +2192,13 @@ func (u *User) loginCheckPhone(c *wkhttp.Context) {
 		c.ResponseError(errors.New("该用户不存在"))
 		return
 	}
-	err = u.smsServie.Verify(spanCtx, userInfo.Zone, userInfo.Phone, req.Code, commonapi.CodeTypeCheckMobile)
-	if err != nil {
-		u.Error("验证短信失败", zap.Error(err))
-		c.ResponseError(err)
-		return
+	if u.isSmsVerifyOn() {
+		err = u.smsServie.Verify(spanCtx, userInfo.Zone, userInfo.Phone, req.Code, commonapi.CodeTypeCheckMobile)
+		if err != nil {
+			u.Error("验证短信失败", zap.Error(err))
+			c.ResponseError(err)
+			return
+		}
 	}
 
 	loginDeviceJsonStr, err := u.ctx.GetRedisConn().GetString(fmt.Sprintf("%s%s", u.ctx.GetConfig().Cache.LoginDeviceCachePrefix, req.UID))
@@ -2276,6 +2290,10 @@ func (u *User) sendDestroyCode(c *wkhttp.Context) {
 		c.ResponseError(errors.New("登录用户不存在"))
 		return
 	}
+	if !u.isSmsVerifyOn() {
+		c.ResponseOK()
+		return
+	}
 	err = u.smsServie.SendVerifyCode(c.Context, userInfo.Zone, userInfo.Phone, commonapi.CodeTypeDestroyAccount)
 	if err != nil {
 		c.ResponseError(err)
@@ -2302,19 +2320,21 @@ func (u *User) destroyAccount(c *wkhttp.Context) {
 		c.ResponseError(errors.New("登录用户不存在"))
 		return
 	}
-	//测试模式
-	if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
-		if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != code {
-			c.ResponseError(errors.New("验证码错误"))
-			return
-		}
-	} else {
-		//线上验证短信验证码
-		// 校验验证码
-		err = u.smsServie.Verify(c.Context, userInfo.Zone, userInfo.Phone, code, commonapi.CodeTypeDestroyAccount)
-		if err != nil {
-			c.ResponseError(err)
-			return
+	if u.isSmsVerifyOn() {
+		//测试模式
+		if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
+			if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != code {
+				c.ResponseError(errors.New("验证码错误"))
+				return
+			}
+		} else {
+			//线上验证短信验证码
+			// 校验验证码
+			err = u.smsServie.Verify(c.Context, userInfo.Zone, userInfo.Phone, code, commonapi.CodeTypeDestroyAccount)
+			if err != nil {
+				c.ResponseError(err)
+				return
+			}
 		}
 	}
 
@@ -2461,18 +2481,20 @@ func (u *User) pwdforget(c *wkhttp.Context) {
 		c.ResponseError(errors.New("该账号不存在"))
 		return
 	}
-	//测试模式
-	if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
-		if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != req.Code {
-			c.ResponseError(errors.New("验证码错误"))
-			return
-		}
-	} else {
-		//线上验证短信验证码
-		err = u.smsServie.Verify(context.Background(), req.Zone, req.Phone, req.Code, commonapi.CodeTypeForgetLoginPWD)
-		if err != nil {
-			c.ResponseError(err)
-			return
+	if u.isSmsVerifyOn() {
+		//测试模式
+		if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != "" {
+			if strings.TrimSpace(u.ctx.GetConfig().SMSCode) != req.Code {
+				c.ResponseError(errors.New("验证码错误"))
+				return
+			}
+		} else {
+			//线上验证短信验证码
+			err = u.smsServie.Verify(context.Background(), req.Zone, req.Phone, req.Code, commonapi.CodeTypeForgetLoginPWD)
+			if err != nil {
+				c.ResponseError(err)
+				return
+			}
 		}
 	}
 
@@ -2518,6 +2540,10 @@ func (u *User) getForgetPwdSMS(c *wkhttp.Context) {
 		c.ResponseError(errors.New("该手机号未注册"))
 		return
 	}
+	if !u.isSmsVerifyOn() {
+		c.ResponseOK()
+		return
+	}
 	err = u.smsServie.SendVerifyCode(spanCtx, req.Zone, req.Phone, commonapi.CodeTypeForgetLoginPWD)
 	if err != nil {
 		u.Error("发送短信验证码失败", zap.Error(err))
@@ -2525,6 +2551,15 @@ func (u *User) getForgetPwdSMS(c *wkhttp.Context) {
 		return
 	}
 	c.ResponseOK()
+}
+
+// isSmsVerifyOn 是否开启短信验证码
+func (u *User) isSmsVerifyOn() bool {
+	appConfig, err := u.commonService.GetAppConfig()
+	if err != nil || appConfig == nil {
+		return true // 出错时默认开启，保证安全
+	}
+	return appConfig.SmsVerifyOn != 0
 }
 
 // 是否允许更新

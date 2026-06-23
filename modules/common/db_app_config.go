@@ -55,5 +55,6 @@ type appConfigModel struct {
 	DisablePrivateMessageOn        int    // 是否开启私聊禁言（禁止私聊发消息）
 	MuteTextOfGroup                string // 群聊禁言客户端展示文案
 	MuteTextOfPrivate              string // 私聊禁言客户端展示文案
+	SmsVerifyOn                    int    // 是否开启短信验证码
 	ldb.BaseModel
 }

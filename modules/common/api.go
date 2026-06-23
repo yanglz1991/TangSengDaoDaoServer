@@ -54,7 +54,7 @@ func (cn *Common) Route(r *wkhttp.WKHttp) {
 	{
 		commonNoAuth.GET("/countries", cn.countriesList)
 
-		commonNoAuth.GET("/appconfig", cn.appConfig) // app配置
+		commonNoAuth.GET("/appconfig", cn.appConfig)            // app配置
 		commonNoAuth.GET("/appversion/list", cn.appVersionList) // 版本列表(免认证,供下载页使用)
 		// commonNoAuth.GET("/keepalive", cn.getKeepAliveVideo)   // 获取后台运行引导视频
 		commonNoAuth.GET("/updater/:os/:version", cn.updater)  // 版本更新检查（兼容tauri）
@@ -291,6 +291,7 @@ func (cn *Common) insertAppConfigIfNeed() (*appConfigModel, error) {
 		SuperToken:    util.GenerUUID(),
 		SuperTokenOn:  0,
 		SearchByPhone: 1,
+		SmsVerifyOn:   1,
 	}
 	err = cn.appConfigDB.insert(appConfigM)
 	return appConfigM, err
@@ -341,6 +342,7 @@ func (cn *Common) appConfig(c *wkhttp.Context) {
 		DisablePrivateMessageOn:        appConfigM.DisablePrivateMessageOn,
 		MuteTextOfGroup:                appConfigM.MuteTextOfGroup,
 		MuteTextOfPrivate:              appConfigM.MuteTextOfPrivate,
+		SmsVerifyOn:                    appConfigM.SmsVerifyOn,
 	})
 }
 
@@ -500,6 +502,7 @@ type appConfigResp struct {
 	DisablePrivateMessageOn        int    `json:"disable_private_message_on"`          // 私聊禁言开关
 	MuteTextOfGroup                string `json:"mute_text_of_group"`                  // 群聊禁言客户端展示文案
 	MuteTextOfPrivate              string `json:"mute_text_of_private"`                // 私聊禁言客户端展示文案
+	SmsVerifyOn                    int    `json:"sms_verify_on"`                       // 是否开启短信验证码
 }
 
 type appVersionReq struct {

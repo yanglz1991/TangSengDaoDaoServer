@@ -215,6 +215,7 @@ func (m *Manager) updateConfig(c *wkhttp.Context) {
 		DisablePrivateMessageOn        int    `json:"disable_private_message_on"`          // 私聊禁言开关
 		MuteTextOfGroup                string `json:"mute_text_of_group"`                  // 群聊禁言文案
 		MuteTextOfPrivate              string `json:"mute_text_of_private"`                // 私聊禁言文案
+		SmsVerifyOn                    int    `json:"sms_verify_on"`                       // 是否开启短信验证码
 	}
 	var req reqVO
 	if err := c.BindJSON(&req); err != nil {
@@ -242,6 +243,7 @@ func (m *Manager) updateConfig(c *wkhttp.Context) {
 	configMap["disable_private_message_on"] = req.DisablePrivateMessageOn
 	configMap["mute_text_of_group"] = req.MuteTextOfGroup
 	configMap["mute_text_of_private"] = req.MuteTextOfPrivate
+	configMap["sms_verify_on"] = req.SmsVerifyOn
 	err = m.appconfigDB.updateWithMap(configMap, appConfigM.Id)
 	if err != nil {
 		m.Error("修改app配置信息错误", zap.Error(err))
@@ -321,6 +323,7 @@ func (m *Manager) appconfig(c *wkhttp.Context) {
 	var disablePrivateMessageOn = 0
 	var muteTextOfGroup = ""
 	var muteTextOfPrivate = ""
+	var smsVerifyOn = 1
 	if appconfig != nil {
 		revokeSecond = appconfig.RevokeSecond
 		welcomeMessage = appconfig.WelcomeMessage
@@ -336,6 +339,7 @@ func (m *Manager) appconfig(c *wkhttp.Context) {
 		disablePrivateMessageOn = appconfig.DisablePrivateMessageOn
 		muteTextOfGroup = appconfig.MuteTextOfGroup
 		muteTextOfPrivate = appconfig.MuteTextOfPrivate
+		smsVerifyOn = appconfig.SmsVerifyOn
 	}
 	if revokeSecond == 0 {
 		revokeSecond = 120
@@ -358,6 +362,7 @@ func (m *Manager) appconfig(c *wkhttp.Context) {
 		DisablePrivateMessageOn:        disablePrivateMessageOn,
 		MuteTextOfGroup:                muteTextOfGroup,
 		MuteTextOfPrivate:              muteTextOfPrivate,
+		SmsVerifyOn:                    smsVerifyOn,
 	})
 }
 
@@ -376,6 +381,7 @@ type managerAppConfigResp struct {
 	DisablePrivateMessageOn        int    `json:"disable_private_message_on"`          // 私聊禁言开关
 	MuteTextOfGroup                string `json:"mute_text_of_group"`                  // 群聊禁言文案
 	MuteTextOfPrivate              string `json:"mute_text_of_private"`                // 私聊禁言文案
+	SmsVerifyOn                    int    `json:"sms_verify_on"`                       // 是否开启短信验证码
 }
 
 type managerAppModule struct {
