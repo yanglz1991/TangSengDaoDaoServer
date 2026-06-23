@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>禧语 - 安全私有化的即时通讯解决方案</title>
+    <!-- Tailwind CSS Play CDN for zero-config modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-100 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <!-- Logo: Simple stylized bubble -->
+                <svg class="w-8 h-8 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    <path d="M8 10h.01"></path>
+                    <path d="M12 10h.01"></path>
+                    <path d="M16 10h.01"></path>
+                </svg>
+                <span class="text-xl font-bold tracking-tight text-slate-950">禧语</span>
+            </div>
+            <nav class="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
+                <a href="#features" class="hover:text-brand-600 transition-colors">功能特性</a>
+                <a href="#about" class="hover:text-brand-600 transition-colors">关于我们</a>
+                <a href="#contact" class="hover:text-brand-600 transition-colors">联系合作</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="bg-white py-20 md:py-32 border-b border-slate-100">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 mb-6">
+                <span class="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse"></span>
+                企业级安全通讯产品
+            </span>
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+                安全私有化的<br class="md:hidden">即时通讯解决方案
+            </h1>
+            <p class="mt-6 text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
+                禧语致力于为组织和企业提供完全自主可控、极致安全的即时通讯系统。支持端到端加密、高并发架构、私有化独立部署，让您的数据主权不受侵害。
+            </p>
+            <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="#features" class="w-full sm:w-auto px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg transition-colors text-center">
+                    了解特性
+                </a>
+                <a href="#about" class="w-full sm:w-auto px-8 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium rounded-lg transition-colors text-center">
+                    关于我们
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-slate-50">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl font-bold text-slate-900">核心优势</h2>
+                <p class="mt-4 text-slate-500">专为对数据安全和沟通效率有极致追求的企业与团队打造</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Card 1 -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-3">极致安全防护</h3>
+                    <p class="text-slate-500 leading-relaxed text-sm">
+                        支持多重加密传输协议与私有化存储，确保敏感商务数据、交流信息不泄露，全面符合企业合规要求。
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+                            <path d="M3 12A9 3 0 0 0 21 12"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-3">私有独立部署</h3>
+                    <p class="text-slate-500 leading-relaxed text-sm">
+                        支持自建服务器部署、云服务器部署，完全掌控服务器物理资源、网络策略和数据备份。
+                    </p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-6">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-3">高并发高可用</h3>
+                    <p class="text-slate-500 leading-relaxed text-sm">
+                        深度优化的底层IM引擎，轻量级高并发架构，确保数万用户在线沟通平滑顺畅、低时延。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Us Section -->
+    <section id="about" class="py-20 bg-white border-t border-slate-100">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h2 class="text-3xl font-bold text-slate-900 mb-6">关于我们</h2>
+            <p class="text-slate-600 leading-relaxed max-w-2xl mx-auto text-base">
+                我们是一家专注于企业通信与信息安全的技术研发团队。凭借在即时通讯（IM）领域多年的深厚积累，我们推出“禧语”通讯系统，旨在帮助广大中小型企业、政企机构降低数字化转型成本，彻底解决内部通讯数据受制于第三方平台、存在安全隐患的行业痛点。
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-12 mt-auto border-t border-slate-800 text-sm">
+        <div class="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+                <div class="flex items-center space-x-2 text-white mb-2">
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span class="font-bold">禧语</span>
+                </div>
+                <p class="text-xs text-slate-500">© 2026 禧语. 保留所有权利。</p>
+            </div>
+            
+            <div class="flex flex-col md:items-end gap-2 text-xs">
+                <!-- ponytail: ICP filing required for domestic auditing -->
+                <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors flex items-center gap-1">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    鄂ICP备2026002616号
+                </a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
