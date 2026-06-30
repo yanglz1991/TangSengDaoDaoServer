@@ -5,12 +5,16 @@ import (
 
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
+	"github.com/sideshow/apns2/token"
 )
 
-//APNS APNS
+// APNS APNS
 type APNS struct {
 	client      *apns2.Client
 	p12FilePath string
+	p8FilePath  string
+	keyID       string
+	teamID      string
 	password    string
 	dev         bool // 是否是开发环境
 
@@ -26,7 +30,32 @@ func NewAPNS(p12FilePath, password string, dev bool) *APNS {
 	return apns
 }
 
+// NewAPNSWithP8 NewAPNSWithP8
+func NewAPNSWithP8(p8FilePath, keyID, teamID string, dev bool) *APNS {
+	apns := &APNS{
+		p8FilePath: p8FilePath,
+		keyID:      keyID,
+		teamID:     teamID,
+		dev:        dev,
+	}
+	return apns
+}
+
 func (a *APNS) createClient() (*apns2.Client, error) {
+	if a.p8FilePath != "" {
+		authKey, err := token.AuthKeyFromFile(a.p8FilePath)
+		if err != nil {
+			return nil, err
+		}
+		tok := &token.Token{AuthKey: authKey, KeyID: a.keyID, TeamID: a.teamID}
+		var client *apns2.Client
+		if a.dev {
+			client = apns2.NewTokenClient(tok).Development()
+		} else {
+			client = apns2.NewTokenClient(tok).Production()
+		}
+		return client, nil
+	}
 	cert, err := certificate.FromP12File(a.p12FilePath, a.password)
 	if err != nil {
 		return nil, err

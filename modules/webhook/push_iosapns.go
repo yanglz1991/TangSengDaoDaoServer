@@ -10,6 +10,7 @@ import (
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/certificate"
+	"github.com/sideshow/apns2/token"
 )
 
 // IOSPayload iOS负载
@@ -31,22 +32,42 @@ type IOSPush struct {
 	topic       string
 	password    string
 	p12FilePath string
+	p8FilePath  string
+	keyID       string
+	teamID      string
 	dev         bool // 是否是开发环境
 	log.Log
 }
 
 // NewIOSPush NewIOSPush
-func NewIOSPush(topic string, dev bool, p12FilePath string, password string) *IOSPush {
+func NewIOSPush(topic string, dev bool, p12FilePath string, password string, p8FilePath string, keyID string, teamID string) *IOSPush {
 	return &IOSPush{
 		topic:       topic,
 		dev:         dev,
 		p12FilePath: p12FilePath,
 		password:    password,
+		p8FilePath:  p8FilePath,
+		keyID:       keyID,
+		teamID:      teamID,
 		Log:         log.NewTLog("IOSPush"),
 	}
 }
 
 func (p *IOSPush) createClient() (*apns2.Client, error) {
+	if p.p8FilePath != "" {
+		authKey, err := token.AuthKeyFromFile(p.p8FilePath)
+		if err != nil {
+			return nil, err
+		}
+		tok := &token.Token{AuthKey: authKey, KeyID: p.keyID, TeamID: p.teamID}
+		var client *apns2.Client
+		if p.dev {
+			client = apns2.NewTokenClient(tok).Development()
+		} else {
+			client = apns2.NewTokenClient(tok).Production()
+		}
+		return client, nil
+	}
 	cert, err := certificate.FromP12File(p.p12FilePath, p.password)
 	if err != nil {
 		return nil, err

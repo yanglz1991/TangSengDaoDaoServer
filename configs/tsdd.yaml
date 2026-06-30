@@ -77,14 +77,19 @@ external:
 #  secretKey: ""   # 七牛云密钥 secretKey
 
 ##################### 推送配置 ####################
-#push:
-#  contentDetailOn: true # 推送内容是否显示详情
-#  pushPoolSize: 100 # 推送池大小
-#  apns: # 苹果推送
-#    dev: false # 是否为开发环境
-#    topic: "" # topic 例如： com.xinbida.tangsengdaodao
-#    password: ""
-#    cert: "" # apns证书路径 例如：configs/push/push.p12
+push:
+  contentDetailOn: true # 推送内容是否显示详情
+  pushPoolSize: 100 # 推送池大小
+  apns: # 苹果推送
+    dev: false # 是否为开发环境
+    topic: "com.im.yq" # topic 即 Bundle ID
+    # p8 Auth Key 方式（推荐）
+    p8FilePath: "configs/push/AuthKey_Q9HQ8MUVYG.p8" # p8 密钥文件路径
+    keyID: "Q9HQ8MUVYG" # Apple Developer 后台创建 Key 时显示的 Key ID
+    teamID: "NWL6VMX5X3" # TODO: 替换为你的新 Apple Developer 账号的 Team ID
+    # p12 证书方式（旧方式，如果用 p8 则留空即可）
+    # password: ""
+    # cert: "" # apns证书路径 例如：configs/push/push.p12
 #  hms: # 华为推送
 #    packageName: "" # 华为推送包名 例如：com.xinbida.tangsengdaodao
 #    appID: "" # 华为推送appID

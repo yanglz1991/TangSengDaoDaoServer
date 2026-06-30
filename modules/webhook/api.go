@@ -21,6 +21,7 @@ import (
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/util"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhook"
 	"github.com/TangSengDaoDao/TangSengDaoDaoServerLib/pkg/wkhttp"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -53,9 +54,14 @@ func New(ctx *config.Context) *Webhook {
 	vivo := ctx.GetConfig().Push.VIVO
 	firebase := ctx.GetConfig().Push.FIREBASE
 
-	if apns.Topic != "" && apns.Cert != "" {
+	if apns.Topic != "" && (apns.Cert != "" || viper.GetString("push.apns.p8FilePath") != "") {
 		pushMap[common.DeviceTypeIOS] = map[string]Push{
-			ctx.GetConfig().Push.APNS.Topic: NewIOSPush(apns.Topic, apns.Dev, apns.Cert, apns.Password),
+			ctx.GetConfig().Push.APNS.Topic: NewIOSPush(
+				apns.Topic, apns.Dev, apns.Cert, apns.Password,
+				viper.GetString("push.apns.p8FilePath"),
+				viper.GetString("push.apns.keyID"),
+				viper.GetString("push.apns.teamID"),
+			),
 		}
 	}
 	if mi.PackageName != "" {
