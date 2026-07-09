@@ -1,0 +1,9 @@
+{
+  "name": "official-website",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "scp index.html qx-web:/tmp/official-website-index.html && ssh qx-web 'sudo cp /tmp/official-website-index.html /www/official-website/index.html && rm /tmp/official-website-index.html'",
+    "run": "ssh qx-web 'sudo pm2 delete all 2>/dev/null; sudo pm2 start npx --name static-web -- serve /www/official-website -l 80'"
+  }
+}
