@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/TangSengDaoDao/TangSengDaoDaoServer/modules/base/event"
@@ -692,13 +693,24 @@ func (m *Manager) sendMsgToAllUsers(c *wkhttp.Context) {
 		c.ResponseError(err)
 		return
 	}
+	type SendMsgItem struct {
+		Type    int    `json:"type"`              // 1=文字 2=图片
+		Content string `json:"content,omitempty"` // 文字内容
+		URL     string `json:"url,omitempty"`     // 图片路径
+		Width   int    `json:"width,omitempty"`   // 图片宽度
+		Height  int    `json:"height,omitempty"`  // 图片高度
+	}
 	type SendMsgReq struct {
-		Content string `json:"content"`
+		Messages []SendMsgItem `json:"messages"`
 	}
 	var req SendMsgReq
 	if err := c.BindJSON(&req); err != nil {
 		m.Error(common.ErrData.Error(), zap.Error(err))
 		c.ResponseError(common.ErrData)
+		return
+	}
+	if len(req.Messages) == 0 {
+		c.ResponseError(errors.New("发送内容不能为空"))
 		return
 	}
 	userList, err := m.userService.GetAllUsers()
@@ -718,29 +730,61 @@ func (m *Manager) sendMsgToAllUsers(c *wkhttp.Context) {
 	if len(tempUserList) > 0 {
 		uids = append(uids, tempUserList)
 	}
-	go m.sendMessageBatch(uids, req.Content)
+	// 构建每条消息的 payload
+	payloads := make([][]byte, 0, len(req.Messages))
+	for _, msg := range req.Messages {
+		var payload map[string]interface{}
+		switch msg.Type {
+		case int(common.Image):
+			payload = map[string]interface{}{
+				"type":   common.Image,
+				"url":    msg.URL,
+				"width":  msg.Width,
+				"height": msg.Height,
+			}
+		case int(common.Text):
+			payload = map[string]interface{}{
+				"type":    common.Text,
+				"content": msg.Content,
+			}
+		default:
+			c.ResponseError(errors.New("不支持的消息类型"))
+			return
+		}
+		payloads = append(payloads, []byte(util.ToJson(payload)))
+	}
+	go m.sendMessageBatchMulti(uids, payloads)
 	c.ResponseOK()
 }
-func (m *Manager) sendMessageBatch(uids [][]string, content string) error {
+func (m *Manager) sendMessageBatchMulti(uids [][]string, payloads [][]byte) {
+	// ponytail: 4核16G服务器，并发10个批次，消息间隔100ms
+	const maxConcurrency = 10
+	sem := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
 	for _, list := range uids {
-		err := m.ctx.SendMessageBatch(&config.MsgSendBatch{
-			Header: config.MsgHeader{
-				RedDot: 1,
-			},
-			FromUID: m.ctx.GetConfig().Account.SystemUID,
-			Payload: []byte(util.ToJson(map[string]interface{}{
-				"content": content,
-				"type":    1,
-			})),
-			Subscribers: list,
-		})
-		if err != nil {
-			m.Error("发送消息错误", zap.Error(err))
-			return errors.New("发送消息错误")
-		}
-		time.Sleep(time.Second)
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(subscribers []string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			for _, payload := range payloads {
+				err := m.ctx.SendMessageBatch(&config.MsgSendBatch{
+					Header: config.MsgHeader{
+						RedDot: 1,
+					},
+					FromUID:     m.ctx.GetConfig().Account.SystemUID,
+					Payload:     payload,
+					Subscribers: subscribers,
+				})
+				if err != nil {
+					m.Error("发送消息错误", zap.Error(err))
+					continue
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}(list)
 	}
-	return nil
+	wg.Wait()
 }
 
 // 发送消息
