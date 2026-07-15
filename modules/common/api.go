@@ -44,6 +44,7 @@ func (cn *Common) Route(r *wkhttp.WKHttp) {
 	common := r.Group("/v1/common", cn.ctx.AuthMiddleware(r))
 	{
 		common.POST("/appversion", cn.addAppVersion)                  // 添加APP版本
+		common.DELETE("/appversion/:id", cn.deleteAppVersion)         // 删除APP版本
 		common.GET("/appversion/:os/:version", cn.getNewVersion)      // 获取最新版本
 		common.GET("/chatbg", cn.chatBgList)                          // 聊天背景列表
 		common.GET("/appmodule", cn.appModule)                        // app模块列表
@@ -383,6 +384,28 @@ func (cn *Common) addAppVersion(c *wkhttp.Context) {
 	c.ResponseOK()
 }
 
+// 删除app版本
+func (cn *Common) deleteAppVersion(c *wkhttp.Context) {
+	err := c.CheckLoginRole()
+	if err != nil {
+		c.ResponseError(err)
+		return
+	}
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.ResponseError(errors.New("版本ID格式有误！"))
+		return
+	}
+	err = cn.db.deleteAppVersion(id)
+	if err != nil {
+		cn.Error("删除版本错误", zap.Error(err))
+		c.ResponseError(errors.New("删除版本错误"))
+		return
+	}
+	c.ResponseOK()
+}
+
 // 获取最新版本
 func (cn *Common) getNewVersion(c *wkhttp.Context) {
 	os := c.Param("os")
@@ -406,6 +429,7 @@ func (cn *Common) getNewVersion(c *wkhttp.Context) {
 		return
 	}
 	c.Response(&appVersionResp{
+		Id:          model.Id,
 		AppVersion:  model.AppVersion,
 		OS:          model.OS,
 		DownloadURL: model.DownloadURL,
@@ -441,6 +465,7 @@ func (cn *Common) appVersionList(c *wkhttp.Context) {
 
 	for _, model := range list {
 		resps = append(resps, &appVersionResp{
+			Id:          model.Id,
 			AppVersion:  model.AppVersion,
 			OS:          model.OS,
 			IsForce:     model.IsForce,
@@ -515,6 +540,7 @@ type appVersionReq struct {
 }
 
 type appVersionResp struct {
+	Id          int64  `json:"id"`           // ID
 	AppVersion  string `json:"app_version"`  // 版本号
 	OS          string `json:"os"`           // 平台 android｜ios
 	IsForce     int    `json:"is_force"`     // 是否强制更新

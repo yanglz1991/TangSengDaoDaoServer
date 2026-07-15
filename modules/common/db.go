@@ -26,6 +26,12 @@ func (d *db) insertAppVersion(m *appVersionModel) (int64, error) {
 	return id, err
 }
 
+// 删除版本升级
+func (d *db) deleteAppVersion(id int64) error {
+	_, err := d.session.DeleteFrom("app_version").Where("id=?", id).Exec()
+	return err
+}
+
 // 查询某个系统的最新版本
 func (d *db) queryNewVersion(os string) (*appVersionModel, error) {
 	var model *appVersionModel
